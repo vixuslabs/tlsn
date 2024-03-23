@@ -10,7 +10,10 @@ use axum::{
 };
 use axum_macros::debug_handler;
 use chrono::Utc;
-use p256::ecdsa::{Signature, SigningKey};
+use mina_signer::{
+    BaseField, Keypair, NetworkId, PubKey, ScalarField, SecKey as SigningKey, Signature, Signer,
+};
+// use p256::ecdsa::{Signature, SigningKey};
 use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::TokioAsyncReadCompatExt;
