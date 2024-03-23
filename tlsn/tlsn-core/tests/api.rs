@@ -113,7 +113,7 @@ fn test_api() {
         HandshakeSummary::new(time + 60, ephem_key.clone(), hs_commitment),
     );
 
-    let signature: P256Signature = signer.sign(&header.to_bytes());
+    let signature: P256Signature = signer.sign(&header.to_bytes().to_array());
     // Notary creates a msg and sends it to Prover
     let msg = SignedSessionHeader {
         header,

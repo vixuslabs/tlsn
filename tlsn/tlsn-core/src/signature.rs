@@ -46,6 +46,12 @@ impl From<MinaSignature> for Signature {
 #[derive(Clone)]
 pub struct Data(pub Vec<u8>);
 
+impl Data {
+    pub fn to_array(&self) -> &[u8] {
+        &self.0
+    }
+}
+
 impl Hashable for Data {
     type D = ();
 
