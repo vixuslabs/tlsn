@@ -4,7 +4,10 @@ use serde::{Deserialize, Serialize};
 use mpz_garble_core::ChaChaEncoder;
 use tls_core::{handshake::HandshakeData, key::PublicKey};
 
+use crate::signature::Data;
 use crate::{merkle::MerkleRoot, HandshakeSummary};
+use bcs;
+use mpz_core::serialize::CanonicalSerialize;
 
 /// An error that can occur while verifying a session header
 #[derive(Debug, thiserror::Error)]
@@ -38,6 +41,12 @@ pub struct SessionHeader {
 }
 
 impl SessionHeader {
+    /// Serialize the session header to bytes
+    pub fn to_bytes(&self) -> Data {
+        let bytes = bcs::to_bytes(self).expect("serialization should not fail");
+        Data(bytes)
+    }
+
     /// Create a new instance of SessionHeader
     pub fn new(
         encoder_seed: [u8; 32],
