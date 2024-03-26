@@ -1,3 +1,5 @@
+//! Signature Mod
+
 use mina_hasher::{DomainParameter, Hashable, ROInput};
 use mina_signer::{
     BaseField, Keypair, NetworkId, PubKey, ScalarField, Signature as MinaSignature, Signer,
@@ -31,7 +33,7 @@ pub struct SignatureVerifyError(String);
 /// A Notary signature.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-
+/// Signature Enum
 pub enum Signature {
     /// A Mina-style signature.
     Mina(MinaSignature),
@@ -43,13 +45,27 @@ impl From<MinaSignature> for Signature {
     }
 }
 
+/// Data Struct
 #[derive(Clone)]
 pub struct Data(pub Vec<u8>);
 
 impl Data {
+    /// to_array method
     pub fn to_array(&self) -> &[u8] {
         &self.0
     }
+
+    /// from method
+    pub fn from(data: &[u8]) -> Self {
+        Self(data.to_vec())
+    }
+
+    // /// sign method
+    // pub fn sign(&self, keypair: &Keypair) -> Signature {
+    //     let mut ctx = mina_signer::create_legacy(());
+    //     let sig = ctx.sign(keypair.secret_key(), self);
+    //     Signature::Mina(sig)
+    // }
 }
 
 impl Hashable for Data {

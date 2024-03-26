@@ -13,6 +13,10 @@ use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
 use tracing::debug;
 
+use tlsn_core::signature::{Data, Signature};
+
+use notary_server::SigningKey as MinaSigningKey;
+
 /// Runs a simple Notary with the provided connection to the Prover.
 pub async fn run_notary<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(conn: T) {
     // Load the notary signing key
@@ -20,14 +24,16 @@ pub async fn run_notary<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(conn
         "../../../notary-server/fixture/notary/notary.key"
     ))
     .unwrap();
-    let signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
+    // let signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
+
+    let signing_key = MinaSigningKey::read_schnorr_pem_file();
 
     // Setup default config. Normally a different ID would be generated
     // for each notarization.
     let config = VerifierConfig::builder().id("example").build().unwrap();
 
     Verifier::new(config)
-        .notarize::<_, p256::ecdsa::Signature>(conn, &signing_key)
+        .notarize::<_, Signature>(conn, &signing_key)
         .await
         .unwrap();
 }
