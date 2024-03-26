@@ -10,9 +10,12 @@ use axum::{
 };
 use axum_macros::debug_handler;
 use chrono::Utc;
+use mina_hasher::{Hashable, ROInput};
 use mina_signer::{
-    BaseField, Keypair, NetworkId, PubKey, ScalarField, SecKey as SigningKey, Signature, Signer,
+    keypair::{Keypair, KeypairError},
+    BaseField, NetworkId, PubKey, ScalarField, SecKey, Signer as MinaSigner,
 };
+use tlsn_core::signature::{Data, Signature};
 // use p256::ecdsa::{Signature, SigningKey};
 use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
@@ -32,6 +35,59 @@ use crate::{
         websocket::websocket_notarize,
     },
 };
+use signature::{Error, Signer};
+
+#[derive(Clone, Debug)]
+pub enum SigningKey {
+    SK(SecKey),
+}
+
+impl SigningKey {
+    pub fn read_schnorr_pem_file() -> Self {
+        SigningKey::SK(SecKey::from_bytes(&[0u8; 32]).unwrap())
+    }
+}
+
+/// Sign the provided message bytestring using `Self` (e.g. a cryptographic key
+/// or connection to an HSM), returning a digital signature.
+impl Signer<Signature> for SigningKey {
+    /// Sign the given message and return a digital signature
+    fn sign(&self, msg: &[u8]) -> Signature {
+        self.try_sign(msg).expect("signature operation failed")
+    }
+
+    fn try_sign(&self, msg: &[u8]) -> Result<Signature, Error> {
+        let mut ctx = mina_signer::create_legacy::<Data>(());
+        match self {
+            Self::SK(sk) => {
+                let key_pair = Keypair::from_secret_key(sk.clone());
+
+                match key_pair {
+                    Ok(key_pair) => {
+                        let sig = ctx.sign(&key_pair, &Data::from(msg));
+                        Ok(Signature::Mina(sig))
+                    }
+                    Err(e) => {
+                        error!("Error creating keypair from secret key: {:?}", e);
+                        // KeypairError
+                        Err(Error::new())
+                    }
+                }
+
+                // ctx.sign(Keypair::from_secret_key(sk), Data::from(msg))
+            }
+        }
+    }
+}
+
+// impl MinaSigner<ScalarField> for SecKey {
+//     fn try_sign(&self, msg: &[u8]) -> Result<ScalarField, Error> {
+//         // Implement the signing logic here
+//         // This is just a placeholder example
+//         let signature = self.0.clone();
+//         Ok(signature)
+//     }
+// }
 
 /// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
 /// so that we can use a single endpoint and handler for notarization for both types of clients

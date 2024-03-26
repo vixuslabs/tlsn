@@ -5,7 +5,10 @@ use p256::ecdsa::SigningKey;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
-use crate::{config::NotarizationProperties, domain::auth::AuthorizationWhitelistRecord};
+use crate::{
+    config::NotarizationProperties, domain::auth::AuthorizationWhitelistRecord,
+    service::SigningKey as MinaSigningKey,
+};
 
 /// Response object of the /session API
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -51,7 +54,7 @@ pub struct SessionData {
 /// Global data that needs to be shared with the axum handlers
 #[derive(Clone, Debug)]
 pub struct NotaryGlobals {
-    pub notary_signing_key: SigningKey,
+    pub notary_signing_key: MinaSigningKey,
     pub notarization_config: NotarizationProperties,
     /// A temporary storage to store configuration data, mainly used for WebSocket client
     pub store: Arc<Mutex<HashMap<String, SessionData>>>,
@@ -61,7 +64,7 @@ pub struct NotaryGlobals {
 
 impl NotaryGlobals {
     pub fn new(
-        notary_signing_key: SigningKey,
+        notary_signing_key: MinaSigningKey,
         notarization_config: NotarizationProperties,
         authorization_whitelist: Option<Arc<HashMap<String, AuthorizationWhitelistRecord>>>,
     ) -> Self {
