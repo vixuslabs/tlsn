@@ -40,7 +40,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.4.1", features = ["v4", "fast-rng"] }
 ws_stream_tungstenite = { version = "0.10.0", features = ["tokio_io"] }
 mina-signer = { git = "https://github.com/o1-labs/proof-systems" }
+mina-hasher = { git = "https://github.com/o1-labs/proof-systems" }
 bcs = "0.1.6"
+signature = "2.2.0"
+tlsn-core = { path = "../tlsn/tlsn-core" }
 
 [dev-dependencies]
 # specify vendored feature to use statically linked copy of OpenSSL
