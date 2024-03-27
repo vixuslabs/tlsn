@@ -142,6 +142,7 @@ impl Verifier<state::Initialized> {
 impl Verifier<state::Setup> {
     /// Runs the verifier until the TLS connection is closed.
     pub async fn run(self) -> Result<Verifier<state::Closed>, VerifierError> {
+        println!("Inside run method");
         let state::Setup {
             mux_ctrl,
             mut mux_fut,

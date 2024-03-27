@@ -13,6 +13,9 @@ mpz-core.workspace = true
 tlsn-prover = { workspace = true, features = ["tracing"] }
 tlsn-verifier.workspace = true
 
+mina-signer = { git = "https://github.com/o1-labs/proof-systems" }
+mina-hasher = { git = "https://github.com/o1-labs/proof-systems" }
+
 p256 = { workspace = true, features = ["ecdsa"] }
 elliptic-curve = { version = "0.13.5", features = ["pkcs8"] }
 webpki-roots.workspace = true

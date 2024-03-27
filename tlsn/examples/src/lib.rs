@@ -26,6 +26,7 @@ pub async fn run_notary<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(conn
     .unwrap();
     // let signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
 
+    // let signing_key = MinaSigningKey::read_default_schnorr_pem_file();
     let signing_key = MinaSigningKey::read_schnorr_pem_file();
 
     // Setup default config. Normally a different ID would be generated

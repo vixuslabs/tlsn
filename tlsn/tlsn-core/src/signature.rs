@@ -2,7 +2,7 @@
 
 use mina_hasher::{DomainParameter, Hashable, ROInput};
 use mina_signer::{
-    BaseField, Keypair, NetworkId, PubKey, ScalarField, Signature as MinaSignature, Signer,
+    BaseField, Keypair, NetworkId, PubKey, ScalarField, Signature as MinaSignature, Signer, SecKey
 };
 use o1_utils::FieldHelpers;
 use serde::{Deserialize, Serialize};
@@ -19,10 +19,31 @@ pub enum NotaryPublicKey {
     PK(PubKey),
 }
 
+impl NotaryPublicKey {
+    /// Returns the bytes of this public key.
+    pub fn from_public_key_pem() -> Self {
+        const PUB_KEY: &str = "B62qowWuY2PsBZsm64j4Uu2AB3y4L6BbHSvtJcSLcsVRXdiuycbi8Ws";
+        let t = PubKey::from_address(PUB_KEY).unwrap();
+        Self::PK(t)
+    }
+}
+
 impl From<PubKey> for NotaryPublicKey {
     fn from(key: PubKey) -> Self {
         Self::PK(key)
     }
+
+    // fn from_public_key_pem() -> Self {
+    //     // let (label, doc) = Document::from_pem(s)?;
+    //     // SubjectPublicKeyInfoRef::validate_pem_label(label)?;
+    //     // Self::from_public_key_der(doc.as_bytes())
+
+    //     const PUB_KEY: &str = "B62qowWuY2PsBZsm64j4Uu2AB3y4L6BbHSvtJcSLcsVRXdiuycbi8Ws";
+
+    //     let t = PubKey::from_address(PUB_KEY).unwrap();
+
+    //     PK(t)
+    // }
 }
 
 /// An error occurred while verifying a signature.

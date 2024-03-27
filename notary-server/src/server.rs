@@ -222,6 +222,7 @@ async fn load_notary_signing_key(config: &NotarySigningKeyProperties) -> Result<
     debug!("Loading notary server's signing key");
 
     let notary_signing_key = MinaSigningKey::read_schnorr_pem_file();
+    // let notary_signing_key = MinaSigningKey::read_default_schnorr_pem_file();
 
     debug!("Successfully loaded notary server's signing key!");
     Ok(notary_signing_key)

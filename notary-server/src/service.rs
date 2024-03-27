@@ -43,8 +43,12 @@ pub enum SigningKey {
 }
 
 impl SigningKey {
-    pub fn read_schnorr_pem_file() -> Self {
+    pub fn read_default_schnorr_pem_file() -> Self {
         SigningKey::SK(SecKey::from_bytes(&[0u8; 32]).unwrap())
+    }
+
+    pub fn read_schnorr_pem_file() -> Self {
+        SigningKey::SK(SecKey::from_base58("EKFSmntAEAPm5CnYMsVpfSEuyNfbXfxy2vHW8HPxGyPPgm5xyRtN").unwrap())
     }
 }
 
@@ -79,15 +83,6 @@ impl Signer<Signature> for SigningKey {
         }
     }
 }
-
-// impl MinaSigner<ScalarField> for SecKey {
-//     fn try_sign(&self, msg: &[u8]) -> Result<ScalarField, Error> {
-//         // Implement the signing logic here
-//         // This is just a placeholder example
-//         let signature = self.0.clone();
-//         Ok(signature)
-//     }
-// }
 
 /// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
 /// so that we can use a single endpoint and handler for notarization for both types of clients
