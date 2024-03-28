@@ -97,17 +97,10 @@ impl TLSNSignature {
     pub fn to_bytes(&self) -> (Vec<u8>, Vec<u8>) {
         match self {
             Self::MinaSchnorr(sig) => (sig.rx.to_bytes(), sig.s.to_bytes()),
-            // Probably wrong
             Self::P256(sig) => {
                 let bytes = sig.to_bytes();
-
-                // let bytes = Vec::deserialize(deserializer)?;
                 let mid = bytes.len() / 2;
-                let bytes1 = bytes[..mid].to_vec();
-                let bytes2 = bytes[mid..].to_vec();
-
-
-                (bytes1, bytes2)
+                (bytes[..mid].to_vec(), bytes[mid..].to_vec())
             }
         }
     }
@@ -125,36 +118,24 @@ impl TLSNSignature {
     ) -> Result<(), SignatureVerifyError> {
         match (self, notary_public_key.into()) {
             (Self::MinaSchnorr(sig), NotaryPublicKey::MinaSchnorr(key)) => {
-
                 let mut ctx = mina_signer::create_legacy(());
-
-                let is_valid = ctx.verify(&sig, &key, msg);
-                if is_valid {
+                if ctx.verify(&sig, &key, msg) {
                     Ok(())
                 } else {
                     Err(SignatureVerifyError(
                         "Signature verification failed".to_string(),
                     ))
                 }
-            },
-            (Self::P256(sig), NotaryPublicKey::P256(key)) => {
-
-                VerifyingKey::from(key)
+            }
+            (Self::P256(sig), NotaryPublicKey::P256(key)) => VerifyingKey::from(key)
                 .verify(msg.to_array(), sig)
-                .map_err(|e| SignatureVerifyError(e.to_string()))
-            },
-            (Self::MinaSchnorr(_), NotaryPublicKey::P256(_)) => {
-
-                Err(SignatureVerifyError(
-                    "3: Invalid public key type for Mina-Schnorr signature".to_string(),
-                ))
-            },
-            (Self::P256(_sig), NotaryPublicKey::MinaSchnorr(_key)) => {
-                
-                Err(SignatureVerifyError(
-                    "4: Invalid public key type for P-256 signature".to_string(),
-                ))
-            },
+                .map_err(|e| SignatureVerifyError(e.to_string())),
+            (Self::MinaSchnorr(_), NotaryPublicKey::P256(_)) => Err(SignatureVerifyError(
+                "Invalid public key type for Mina-Schnorr signature".to_string(),
+            )),
+            (Self::P256(_), NotaryPublicKey::MinaSchnorr(_)) => Err(SignatureVerifyError(
+                "Invalid public key type for P-256 signature".to_string(),
+            )),
         }
     }
 }

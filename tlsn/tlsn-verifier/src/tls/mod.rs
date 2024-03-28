@@ -113,8 +113,7 @@ impl Verifier<state::Initialized> {
         signer: &impl Signer<T>,
     ) -> Result<SessionHeader, VerifierError>
     where
-        // Signature: From<T>,
-        T: Into<TLSNSignature>
+        TLSNSignature: From<T>,
     {
         self.setup(socket)
             .await?

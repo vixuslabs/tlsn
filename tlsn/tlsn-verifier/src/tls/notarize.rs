@@ -20,8 +20,7 @@ impl Verifier<Notarize> {
     /// Notarizes the TLS session.
     pub async fn finalize<T>(self, signer: &impl Signer<T>) -> Result<SessionHeader, VerifierError>
     where
-        // Signature: From<T>,
-        T: Into<TLSNSignature>
+        TLSNSignature: From<T>,
     {
         let Notarize {
             mut mux_ctrl,

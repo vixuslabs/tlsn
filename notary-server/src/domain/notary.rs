@@ -95,6 +95,7 @@ impl NotaryGlobals {
         notarization_config: NotarizationProperties,
         authorization_whitelist: Option<Arc<HashMap<String, AuthorizationWhitelistRecord>>>,
     ) -> Result<Self, NotaryServerError> {
+
         let notary_signing_key = match TLSNSigningKey::read_p256_pem_file(&config.private_key_pem_path) {
             Ok(key) => key,
             Err(err) => return Err(NotaryServerError::Connection("Failed to read P256 private key".to_string())),

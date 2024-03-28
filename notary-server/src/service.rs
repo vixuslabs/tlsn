@@ -47,11 +47,6 @@ pub enum TLSNSigningKey {
     P256(p256::ecdsa::SigningKey),
 }
 
-// impl From<SecKey> for TLSNSigningKey {
-//     fn from(key: SecKey) -> Self {
-//         Self::MinaSchnorr(key)
-//     }
-// }
 impl From<mina_signer::seckey::SecKey> for TLSNSigningKey {
     fn from(key: SecKey) -> Self {
         Self::MinaSchnorr(key)

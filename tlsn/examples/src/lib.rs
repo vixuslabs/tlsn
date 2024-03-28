@@ -32,7 +32,7 @@ pub async fn run_notary_full<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>
             .unwrap();
             let p256_signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
 
-            TLSNSigningKey::P256(p256_signing_key)
+            TLSNSigningKey::from(p256_signing_key)
         }
         TLSNSigningKeyTypeNames::MinaSchnorr => {
             let signing_key_str = std::str::from_utf8(
@@ -42,7 +42,7 @@ pub async fn run_notary_full<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>
 
             let signing_key_schnorr = SecKey::from_base58(signing_key_str).unwrap();
 
-            TLSNSigningKey::MinaSchnorr(signing_key_schnorr)
+            TLSNSigningKey::from(signing_key_schnorr)
         }
     };
 
