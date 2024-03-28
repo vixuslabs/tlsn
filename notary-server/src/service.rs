@@ -64,8 +64,6 @@ impl From<p256::ecdsa::SigningKey> for TLSNSigningKey {
     }
 }
 
-const DEFAULT_PEM_PATH: &str = "../../notary-server/fixture/notary/notary.key";
-
 
 impl TLSNSigningKey {
     pub fn read_default_schnorr_pem_file() -> Self {
@@ -119,41 +117,6 @@ impl Signer<tlsn_core::TLSNSignature> for TLSNSigningKey {
         }
     }
 }
-
-
-// impl Signer<Signature> for TLSNSigningKey {
-//     /// Sign the given message and return a digital signature
-//     fn sign(&self, msg: &[u8]) -> Signature {
-//         self.try_sign(msg).expect("signature operation failed")
-//     }
-
-//     fn try_sign(&self, msg: &[u8]) -> Result<Signature, Error> {
-//         let mut ctx = mina_signer::create_legacy::<Data>(());
-//         match self {
-//             Self::MinaSchnorr(sk) => {
-//                 let key_pair = Keypair::from_secret_key(sk.clone());
-
-//                 match key_pair {
-//                     Ok(key_pair) => {
-//                         let sig = ctx.sign(&key_pair, &Data::from(msg));
-//                         Ok(Signature::MinaSchnorr(sig))
-//                     }
-//                     Err(e) => {
-//                         error!("Error creating keypair from secret key: {:?}", e);
-//                         // KeypairError
-//                         Err(Error::new())
-//                     }
-//                 }
-
-//                 // ctx.sign(Keypair::from_secret_key(sk), Data::from(msg))
-//             }
-//             Self::P256(sk) => {
-//                 let sig = sk.sign(msg);
-//                 Ok(Signature::P256(sig))
-//             }
-//         }
-//     }
-// }
 
 /// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
 /// so that we can use a single endpoint and handler for notarization for both types of clients

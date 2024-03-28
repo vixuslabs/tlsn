@@ -1,12 +1,19 @@
 //! Signature Mod
 
-use mina_hasher::{DomainParameter, Hashable, ROInput};
+use mina_hasher::{Hashable, ROInput};
 use mina_signer::{
-    BaseField, Keypair, NetworkId, PubKey, ScalarField, Signer, SecKey
+    BaseField, PubKey, ScalarField, Signer
 };
 use o1_utils::FieldHelpers;
-use p256::{ecdsa::{signature::Verifier, VerifyingKey}, elliptic_curve::generic_array::GenericArray};
-use serde::{Deserialize, Serialize};
+use p256::{
+    ecdsa::{
+        signature::Verifier, 
+        VerifyingKey
+    }, 
+    elliptic_curve::generic_array::GenericArray
+};
+
+use serde::de::Error;
 
 /// A Notary public key.
 #[derive(Debug, Clone)]
@@ -16,15 +23,6 @@ pub enum NotaryPublicKey {
     MinaSchnorr(PubKey),
     /// A NIST P-256 public key.
     P256(p256::PublicKey),
-}
-
-impl NotaryPublicKey {
-    /// Returns the bytes of this public key.
-    pub fn from_public_key_pem() -> Self {
-        const PUB_KEY: &str = "B62qowWuY2PsBZsm64j4Uu2AB3y4L6BbHSvtJcSLcsVRXdiuycbi8Ws";
-        let t = PubKey::from_address(PUB_KEY).unwrap();
-        Self::MinaSchnorr(t)
-    }
 }
 
 impl From<PubKey> for NotaryPublicKey {
@@ -128,8 +126,6 @@ impl TLSNSignature {
         match (self, notary_public_key.into()) {
             (Self::MinaSchnorr(sig), NotaryPublicKey::MinaSchnorr(key)) => {
 
-                println!("Inside Self::MinaSchnorr(sig) NotaryPublicKey::MinaSchnorr(key)");
-
                 let mut ctx = mina_signer::create_legacy(());
 
                 let is_valid = ctx.verify(&sig, &key, msg);
@@ -143,9 +139,6 @@ impl TLSNSignature {
             },
             (Self::P256(sig), NotaryPublicKey::P256(key)) => {
 
-                println!("Inside Self::P256(sig) NotaryPublicKey::P256(key)");
-
-
                 VerifyingKey::from(key)
                 .verify(msg.to_array(), sig)
                 .map_err(|e| SignatureVerifyError(e.to_string()))
@@ -156,11 +149,8 @@ impl TLSNSignature {
                     "3: Invalid public key type for Mina-Schnorr signature".to_string(),
                 ))
             },
-            (Self::P256(sig), NotaryPublicKey::MinaSchnorr(key)) => {
+            (Self::P256(_sig), NotaryPublicKey::MinaSchnorr(_key)) => {
                 
-
-                println!("self: {:?}", self);
-
                 Err(SignatureVerifyError(
                     "4: Invalid public key type for P-256 signature".to_string(),
                 ))
@@ -186,7 +176,6 @@ impl<'de> serde::Deserialize<'de> for TLSNSignature {
     where
         D: serde::Deserializer<'de>,
     {
-        use serde::de::Error;
 
         let bytes = Vec::<u8>::deserialize(deserializer)?;
 

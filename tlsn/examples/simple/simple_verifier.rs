@@ -37,9 +37,6 @@ fn main() {
         substrings,
     } = proof;
 
-    println!("Verifying proof...");
-    println!("session.signature {:?}", session.signature);
-    println!("session.header {:?}", session.header);
 
     // Verify the session proof against the Notary's public key
     //
@@ -101,7 +98,6 @@ fn notary_pubkey(signature_type: TLSNSigningKeyTypeNames) -> NotaryPublicKey {
             NotaryPublicKey::P256(pub_key_p256)
         }
         TLSNSigningKeyTypeNames::MinaSchnorr => {
-            // NotaryPublicKey::from_public_key_pem()
             let pub_key_str = str::from_utf8(include_bytes!(
                 "../../../notary-server/fixture/schnorr/notary.pub"
             )).unwrap();

@@ -11,6 +11,8 @@ use hyper::server::{
     accept::Accept,
     conn::{AddrIncoming, Http},
 };
+use mina_signer::SecKey;
+use p256::pkcs8::DecodePrivateKey;
 // use p256::pkcs8::DecodePrivateKey;
 // use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
 use rustls::{Certificate, PrivateKey, ServerConfig};
@@ -32,7 +34,7 @@ use crate::{
     config::{NotaryServerProperties, NotarySigningKeyProperties, TLSNSigningKeyTypeNames},
     domain::{
         auth::{authorization_whitelist_vec_into_hashmap, AuthorizationWhitelistRecord},
-        notary::{NotaryGlobals},
+        notary::NotaryGlobals,
         InfoResponse,
     },
     error::NotaryServerError,
@@ -229,14 +231,29 @@ pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotarySer
 async fn load_notary_signing_key(config: &NotarySigningKeyProperties) -> Result<TLSNSigningKey> {
     debug!("Loading notary server's signing key");
 
-    // let notary_signing_key = SigningKey::read_schnorr_pem_file();
     let notary_signing_key = match config.signing_key_type_name {
-        TLSNSigningKeyTypeNames::MinaSchnorr => TLSNSigningKey::read_schnorr_pem_file(&config.private_key_pem_path),
-        TLSNSigningKeyTypeNames::P256 => Ok(TLSNSigningKey::read_p256_pem_file(&config.private_key_pem_path).unwrap()),
+        TLSNSigningKeyTypeNames::MinaSchnorr => {
+
+            let path = &config.private_key_pem_path;
+            let signing_key_bytes = tokio::fs::read(path).await?;
+            let signing_key_str = std::str::from_utf8(&signing_key_bytes).unwrap();
+
+            let signing_key_schnorr = SecKey::from_base58(signing_key_str).unwrap();
+
+            TLSNSigningKey::MinaSchnorr(signing_key_schnorr)
+        },
+        TLSNSigningKeyTypeNames::P256 => {
+            let path = &config.private_key_pem_path;
+            let signing_key_bytes = tokio::fs::read(path).await?;
+            let signing_key_str = std::str::from_utf8(&signing_key_bytes).unwrap();
+            let p256_signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
+
+            TLSNSigningKey::P256(p256_signing_key)
+        },
     };
 
     debug!("Successfully loaded notary server's signing key!");
-    Ok(notary_signing_key.unwrap())
+    Ok(notary_signing_key)
 }
 
 /// Read a PEM-formatted file and return its buffer reader
@@ -283,13 +300,25 @@ mod test {
         assert!(result.is_ok(), "Could not load tls private key and cert");
     }
 
-    // #[tokio::test]
-    // async fn test_load_notary_signing_key() {
-    //     let config = NotarySigningKeyProperties {
-    //         private_key_pem_path: "./fixture/notary/notary.key".to_string(),
-    //         public_key_pem_path: "./fixture/notary/notary.pub".to_string(),
-    //     };
-    //     let result: Result<SigningKey> = load_notary_signing_key(&config).await;
-    //     assert!(result.is_ok(), "Could not load notary private key");
-    // }
+    #[tokio::test]
+    async fn test_load_notary_p256_signing_key() {
+        let config = NotarySigningKeyProperties {
+            signing_key_type_name: TLSNSigningKeyTypeNames::P256,
+            private_key_pem_path: "./fixture/notary/notary.key".to_string(),
+            public_key_pem_path: "./fixture/notary/notary.pub".to_string(),
+        };
+        let result: Result<TLSNSigningKey> = load_notary_signing_key(&config).await;
+        assert!(result.is_ok(), "Could not load notary private key");
+    }
+
+    #[tokio::test]
+    async fn test_load_notary_mina_schnorr_signing_key() {
+        let config = NotarySigningKeyProperties {
+            signing_key_type_name: TLSNSigningKeyTypeNames::MinaSchnorr,
+            private_key_pem_path: "./fixture/schnorr/notary.key".to_string(),
+            public_key_pem_path: "./fixture/notary/notary.pub".to_string(),
+        };
+        let result: Result<TLSNSigningKey> = load_notary_signing_key(&config).await;
+        assert!(result.is_ok(), "Could not load notary private key");
+    }
 }

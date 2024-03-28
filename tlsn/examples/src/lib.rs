@@ -14,10 +14,11 @@ use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
 use tracing::debug;
 
-use tlsn_core::signature::{Data, TLSNSignature};
+use tlsn_core::signature::TLSNSignature;
 
 use notary_server::TLSNSigningKey;
 
+/// Runs a simple Notary with the provided connection to the Prover, like `run_notary` but with an extra arg which allows you to specify the signing key type.
 pub async fn run_notary_full<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     conn: T,
     signing_key_type: TLSNSigningKeyTypeNames,
@@ -39,15 +40,9 @@ pub async fn run_notary_full<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>
             )
             .unwrap();
 
-            println!("signing_key_str: {:?}", signing_key_str);
-
             let signing_key_schnorr = SecKey::from_base58(signing_key_str).unwrap();
 
             TLSNSigningKey::MinaSchnorr(signing_key_schnorr)
-
-            // let signing_key = TLSNSigningKey::read_schnorr_pem_file(signing_key_str).unwrap();
-
-            // signing_key
         }
     };
 
