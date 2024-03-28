@@ -25,6 +25,10 @@ fn main() {
         substrings,
     } = proof;
 
+    println!("Verifying proof...");
+    println!("session.signature {:?}", session.signature);
+    println!("session.header {:?}", session.header);
+
     // Verify the session proof against the Notary's public key
     //
     // This verifies the identity of the server using a default certificate verifier which trusts
@@ -73,10 +77,10 @@ fn main() {
 
 /// Returns a Notary pubkey trusted by this Verifier
 fn notary_pubkey() -> NotaryPublicKey {
-    let pem_file = str::from_utf8(include_bytes!(
-        "../../../notary-server/fixture/notary/schnorr/notary.pub"
-    ))
-    .unwrap();
+    // let pem_file = str::from_utf8(include_bytes!(
+    //     "../../../notary-server/fixture/notary/schnorr/notary.pub"
+    // ))
+    // .unwrap();
 
     NotaryPublicKey::from_public_key_pem()
 

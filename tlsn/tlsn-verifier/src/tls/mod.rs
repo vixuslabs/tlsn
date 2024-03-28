@@ -34,7 +34,7 @@ use tlsn_common::{
     mux::{attach_mux, MuxControl},
     Role,
 };
-use tlsn_core::{proof::SessionInfo, RedactedTranscript, SessionHeader, Signature};
+use tlsn_core::{proof::SessionInfo, RedactedTranscript, SessionHeader, TLSNSignature};
 use utils_aio::{duplex::Duplex, mux::MuxChannel};
 
 #[cfg(feature = "tracing")]
@@ -113,7 +113,8 @@ impl Verifier<state::Initialized> {
         signer: &impl Signer<T>,
     ) -> Result<SessionHeader, VerifierError>
     where
-        T: Into<Signature>,
+        // Signature: From<T>,
+        T: Into<TLSNSignature>
     {
         self.setup(socket)
             .await?

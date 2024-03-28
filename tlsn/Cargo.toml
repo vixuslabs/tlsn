@@ -45,6 +45,7 @@ tokio = "1"
 
 signature = "2"
 p256 = "0.13"
+k256 = "0.13.3"
 rs_merkle = "1"
 rand_chacha = "0.3"
 rand = "0.8"

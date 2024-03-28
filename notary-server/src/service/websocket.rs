@@ -2,7 +2,7 @@ use tracing::{debug, error, info};
 use ws_stream_tungstenite::WsStream;
 
 use crate::{
-    domain::notary::NotaryGlobals,
+    domain::notary::{NotaryGlobals, TLSNSigningKey},
     service::{axum_websocket::WebSocket, notary_service},
 };
 

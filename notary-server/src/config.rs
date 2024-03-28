@@ -53,7 +53,15 @@ pub struct TLSProperties {
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+pub enum TLSNSigningKeyTypeNames {
+    MinaSchnorr,
+    P256,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub struct NotarySigningKeyProperties {
+    pub signing_key_type_name: TLSNSigningKeyTypeNames,
     pub private_key_pem_path: String,
     pub public_key_pem_path: String,
 }

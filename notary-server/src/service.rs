@@ -9,19 +9,23 @@ use axum::{
     response::{IntoResponse, Json, Response},
 };
 use axum_macros::debug_handler;
+use base64::Engine;
 use chrono::Utc;
-use mina_hasher::{Hashable, ROInput};
 use mina_signer::{
-    keypair::{Keypair, KeypairError},
-    BaseField, NetworkId, PubKey, ScalarField, SecKey, Signer as MinaSigner,
+    keypair::Keypair,
+    SecKey, Signer as MinaSigner,
+    Signature as MinaSignature,
 };
-use tlsn_core::signature::{Data, Signature};
-// use p256::ecdsa::{Signature, SigningKey};
+use sha1::digest::generic_array::GenericArray;
+use tlsn_core::signature::{Data, TLSNSignature};
+// use p256::ecdsa::{Signature, TLSNSigningKey};
 use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info, trace};
 use uuid::Uuid;
+
+use p256::pkcs8::DecodePrivateKey;
 
 use crate::{
     domain::notary::{
@@ -38,51 +42,121 @@ use crate::{
 use signature::{Error, Signer};
 
 #[derive(Clone, Debug)]
-pub enum SigningKey {
-    SK(SecKey),
+pub enum TLSNSigningKey {
+    MinaSchnorr(SecKey),
+    P256(p256::ecdsa::SigningKey),
 }
 
-impl SigningKey {
+// impl From<SecKey> for TLSNSigningKey {
+//     fn from(key: SecKey) -> Self {
+//         Self::MinaSchnorr(key)
+//     }
+// }
+impl From<mina_signer::seckey::SecKey> for TLSNSigningKey {
+    fn from(key: SecKey) -> Self {
+        Self::MinaSchnorr(key)
+    }
+}
+
+impl From<p256::ecdsa::SigningKey> for TLSNSigningKey {
+    fn from(key: p256::ecdsa::SigningKey) -> Self {
+        Self::P256(key)
+    }
+}
+
+const DEFAULT_PEM_PATH: &str = "../../notary-server/fixture/notary/notary.key";
+
+
+impl TLSNSigningKey {
     pub fn read_default_schnorr_pem_file() -> Self {
-        SigningKey::SK(SecKey::from_bytes(&[0u8; 32]).unwrap())
+        Self::MinaSchnorr(SecKey::from_bytes(&[0u8; 32]).unwrap())
     }
 
-    pub fn read_schnorr_pem_file() -> Self {
-        SigningKey::SK(SecKey::from_base58("EKFSmntAEAPm5CnYMsVpfSEuyNfbXfxy2vHW8HPxGyPPgm5xyRtN").unwrap())
+    pub fn read_schnorr_pem_file(path: &str) -> Result<Self, ()> {
+        Ok(Self::MinaSchnorr(SecKey::from_base58("EKFSmntAEAPm5CnYMsVpfSEuyNfbXfxy2vHW8HPxGyPPgm5xyRtN").unwrap()))
+        // println!("path: {:?}", path);
+        // Ok(Self::MinaSchnorr(SecKey::from_base58(path).unwrap()))
+    }
+
+    pub fn read_p256_pem_file(path: &str) -> Result<Self, eyre::Error> {  
+
+        let signing_key_str = std::fs::read_to_string(DEFAULT_PEM_PATH)
+            .map_err(|err| eyre::eyre!("Failed to read P256 PEM file: {}", err))?;
+
+        let signing_key = p256::ecdsa::SigningKey::read_pkcs8_pem_file(signing_key_str)
+            .map_err(|err| eyre::eyre!("Failed to parse P256 PEM file: {}", err))?; 
+
+        Ok(Self::P256(signing_key))
+
+        // let signing_key_str = std::fs::read_to_string(DEFAULT_PEM_PATH)
+        // .map_err(|_| ())?;
+        
+
+        // Ok(Self::P256(p256::ecdsa::SigningKey::read_pkcs8_pem_file(signing_key_str).unwrap()))
+    
+        // Ok(Self::P256(p256::ecdsa::SigningKey::read_pkcs8_pem_file(path).unwrap()))
     }
 }
+
 
 /// Sign the provided message bytestring using `Self` (e.g. a cryptographic key
 /// or connection to an HSM), returning a digital signature.
-impl Signer<Signature> for SigningKey {
-    /// Sign the given message and return a digital signature
-    fn sign(&self, msg: &[u8]) -> Signature {
+impl Signer<tlsn_core::TLSNSignature> for TLSNSigningKey {
+    fn sign(&self, msg: &[u8]) -> tlsn_core::TLSNSignature {
         self.try_sign(msg).expect("signature operation failed")
     }
 
-    fn try_sign(&self, msg: &[u8]) -> Result<Signature, Error> {
-        let mut ctx = mina_signer::create_legacy::<Data>(());
+    fn try_sign(&self, msg: &[u8]) -> Result<tlsn_core::TLSNSignature, signature::Error> {
         match self {
-            Self::SK(sk) => {
-                let key_pair = Keypair::from_secret_key(sk.clone());
-
-                match key_pair {
-                    Ok(key_pair) => {
-                        let sig = ctx.sign(&key_pair, &Data::from(msg));
-                        Ok(Signature::Mina(sig))
-                    }
-                    Err(e) => {
-                        error!("Error creating keypair from secret key: {:?}", e);
-                        // KeypairError
-                        Err(Error::new())
-                    }
-                }
-
-                // ctx.sign(Keypair::from_secret_key(sk), Data::from(msg))
+            TLSNSigningKey::MinaSchnorr(sk) => {
+                let mut ctx = mina_signer::create_legacy::<tlsn_core::signature::Data>(());
+                let key_pair = Keypair::from_secret_key(sk.clone())
+                    .map_err(|_| signature::Error::new())?;
+                let sig = ctx.sign(&key_pair, &Data::from(msg));
+                Ok(TLSNSignature::MinaSchnorr(sig))
+            }
+            TLSNSigningKey::P256(sk) => {
+                let sig = sk.try_sign(msg)?;
+                Ok(tlsn_core::TLSNSignature::P256(sig))
             }
         }
     }
 }
+
+
+// impl Signer<Signature> for TLSNSigningKey {
+//     /// Sign the given message and return a digital signature
+//     fn sign(&self, msg: &[u8]) -> Signature {
+//         self.try_sign(msg).expect("signature operation failed")
+//     }
+
+//     fn try_sign(&self, msg: &[u8]) -> Result<Signature, Error> {
+//         let mut ctx = mina_signer::create_legacy::<Data>(());
+//         match self {
+//             Self::MinaSchnorr(sk) => {
+//                 let key_pair = Keypair::from_secret_key(sk.clone());
+
+//                 match key_pair {
+//                     Ok(key_pair) => {
+//                         let sig = ctx.sign(&key_pair, &Data::from(msg));
+//                         Ok(Signature::MinaSchnorr(sig))
+//                     }
+//                     Err(e) => {
+//                         error!("Error creating keypair from secret key: {:?}", e);
+//                         // KeypairError
+//                         Err(Error::new())
+//                     }
+//                 }
+
+//                 // ctx.sign(Keypair::from_secret_key(sk), Data::from(msg))
+//             }
+//             Self::P256(sk) => {
+//                 let sig = sk.sign(msg);
+//                 Ok(Signature::P256(sig))
+//             }
+//         }
+//     }
+// }
 
 /// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
 /// so that we can use a single endpoint and handler for notarization for both types of clients
@@ -208,7 +282,7 @@ pub async fn initialize(
 /// Run the notarization
 pub async fn notary_service<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     socket: T,
-    signing_key: &SigningKey,
+    signing_key: &TLSNSigningKey,
     session_id: &str,
     max_transcript_size: Option<usize>,
 ) -> Result<(), NotaryServerError> {
@@ -225,8 +299,22 @@ pub async fn notary_service<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let config = config_builder.build()?;
 
     Verifier::new(config)
-        .notarize::<_, Signature>(socket.compat(), signing_key)
+        .notarize::<_, TLSNSignature>(socket.compat(), signing_key)
         .await?;
+
+    // match signing_key {
+    //     TLSNSigningKey::MinaSchnorr(key) => {
+    //         Verifier::new(config)
+    //             .notarize::<_, TLSNSignature>(socket.compat(), signing_key)
+    //             .await?;
+    //     }
+    //     TLSNSigningKey::P256(key) => {
+    //         Verifier::new(config)
+    //             .notarize::<_, p256::ecdsa::Signature>(socket.compat(), key)
+    //             .await?;
+    //     },
+    //     // _ => unimplemented!("Mina Schnorr notarization is not yet implemented")
+    // }
 
     Ok(())
 }

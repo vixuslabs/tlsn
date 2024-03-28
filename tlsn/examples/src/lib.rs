@@ -13,28 +13,34 @@ use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
 use tracing::debug;
 
-use tlsn_core::signature::{Data, Signature};
+use tlsn_core::signature::{Data, TLSNSignature};
 
-use notary_server::SigningKey as MinaSigningKey;
+use notary_server::TLSNSigningKey;
+
 
 /// Runs a simple Notary with the provided connection to the Prover.
 pub async fn run_notary<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(conn: T) {
     // Load the notary signing key
+    // let signing_key_str = std::str::from_utf8(include_bytes!(
+    //     "../../../notary-server/fixture/schnorr/notary.key"
+    // ))
+    // .unwrap();
+
+    // let signing_key = TLSNSigningKey::read_schnorr_pem_file(&signing_key_str).unwrap();
+
     let signing_key_str = std::str::from_utf8(include_bytes!(
         "../../../notary-server/fixture/notary/notary.key"
     ))
     .unwrap();
-    // let signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
 
-    // let signing_key = MinaSigningKey::read_default_schnorr_pem_file();
-    let signing_key = MinaSigningKey::read_schnorr_pem_file();
+    let signing_key = TLSNSigningKey::read_p256_pem_file(signing_key_str).unwrap();
 
     // Setup default config. Normally a different ID would be generated
     // for each notarization.
     let config = VerifierConfig::builder().id("example").build().unwrap();
 
     Verifier::new(config)
-        .notarize::<_, Signature>(conn, &signing_key)
+        .notarize::<_, TLSNSignature>(conn, &signing_key)
         .await
         .unwrap();
 }

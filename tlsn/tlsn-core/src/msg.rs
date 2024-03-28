@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use utils::range::RangeSet;
 
-use crate::{merkle::MerkleRoot, proof::SessionInfo, signature::Signature, SessionHeader};
+use crate::{merkle::MerkleRoot, proof::SessionInfo, signature::TLSNSignature, SessionHeader};
 
 /// Top-level enum for all messages
 #[derive(Debug, Serialize, Deserialize)]
@@ -26,7 +26,7 @@ pub struct SignedSessionHeader {
     /// The session header
     pub header: SessionHeader,
     /// The notary's signature
-    pub signature: Signature,
+    pub signature: TLSNSignature,
 }
 
 /// Information about the values the prover wants to prove

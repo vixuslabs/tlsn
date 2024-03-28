@@ -9,7 +9,7 @@ use mpz_share_conversion::ShareConversionVerify;
 use signature::Signer;
 use tlsn_core::{
     msg::{SignedSessionHeader, TlsnMessage},
-    HandshakeSummary, SessionHeader, Signature,
+    HandshakeSummary, SessionHeader, TLSNSignature,
 };
 use utils_aio::{expect_msg_or_err, mux::MuxChannel};
 
@@ -20,7 +20,8 @@ impl Verifier<Notarize> {
     /// Notarizes the TLS session.
     pub async fn finalize<T>(self, signer: &impl Signer<T>) -> Result<SessionHeader, VerifierError>
     where
-        T: Into<Signature>,
+        // Signature: From<T>,
+        T: Into<TLSNSignature>
     {
         let Notarize {
             mut mux_ctrl,

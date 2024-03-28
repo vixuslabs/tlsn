@@ -17,7 +17,7 @@ pub mod signature;
 pub mod transcript;
 
 pub use session::{HandshakeSummary, NotarizedSession, SessionData, SessionHeader};
-pub use signature::{Data, NotaryPublicKey, Signature};
+pub use signature::{Data, NotaryPublicKey, TLSNSignature};
 pub use transcript::{Direction, RedactedTranscript, Transcript, TranscriptSlice};
 
 use mpz_garble_core::{encoding_state, EncodedValue};

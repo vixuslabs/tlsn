@@ -27,9 +27,7 @@ use tracing::debug;
 use ws_stream_tungstenite::WsStream;
 
 use notary_server::{
-    read_pem_file, run_server, AuthorizationProperties, LoggingProperties, NotarizationProperties,
-    NotarizationSessionRequest, NotarizationSessionResponse, NotaryServerProperties,
-    NotarySigningKeyProperties, ServerProperties, TLSProperties,
+    read_pem_file, run_server, AuthorizationProperties, LoggingProperties, NotarizationProperties, NotarizationSessionRequest, NotarizationSessionResponse, NotaryServerProperties, NotarySigningKeyProperties, ServerProperties, TLSNSigningKeyTypeNames, TLSProperties
 };
 
 const NOTARY_CA_CERT_PATH: &str = "./fixture/tls/rootCA.crt";
@@ -51,8 +49,9 @@ fn get_server_config(port: u16, tls_enabled: bool) -> NotaryServerProperties {
             certificate_pem_path: "./fixture/tls/notary.crt".to_string(),
         },
         notary_key: NotarySigningKeyProperties {
-            private_key_pem_path: "./fixture/notary/notary.key".to_string(),
-            public_key_pem_path: "./fixture/notary/notary.pub".to_string(),
+            signing_key_type_name: TLSNSigningKeyTypeNames::MinaSchnorr,
+            private_key_pem_path: "./fixture/notary/schnorr/notary.key".to_string(),
+            public_key_pem_path: "./fixture/notary/schnorr/notary.pub".to_string(),
         },
         logging: LoggingProperties {
             level: "DEBUG".to_string(),
@@ -75,6 +74,7 @@ async fn setup_config_and_server(
     let _ = tracing_subscriber::fmt::try_init();
 
     let config = notary_config.clone();
+
 
     // Run the notary server
     tokio::spawn(async move {

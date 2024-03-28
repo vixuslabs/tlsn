@@ -12,7 +12,7 @@ use hyper::server::{
     conn::{AddrIncoming, Http},
 };
 // use p256::pkcs8::DecodePrivateKey;
-use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
+// use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
 use rustls::{Certificate, PrivateKey, ServerConfig};
 use std::{
     fs::File as StdFile,
@@ -29,21 +29,22 @@ use tower::MakeService;
 use tracing::{debug, error, info};
 
 use crate::{
-    config::{NotaryServerProperties, NotarySigningKeyProperties},
+    config::{NotaryServerProperties, NotarySigningKeyProperties, TLSNSigningKeyTypeNames},
     domain::{
         auth::{authorization_whitelist_vec_into_hashmap, AuthorizationWhitelistRecord},
-        notary::NotaryGlobals,
+        notary::{NotaryGlobals},
         InfoResponse,
     },
     error::NotaryServerError,
     middleware::AuthorizationMiddleware,
-    service::{initialize, upgrade_protocol, SigningKey as MinaSigningKey},
+    service::{initialize, upgrade_protocol, TLSNSigningKey},
     util::parse_csv_file,
 };
 
 /// Start a TCP server (with or without TLS) to accept notarization request for both TCP and WebSocket clients
 #[tracing::instrument(skip(config))]
 pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotaryServerError> {
+
     // Load the private key for notarized transcript signing
     let notary_signing_key = load_notary_signing_key(&config.notary_key).await?;
     // Build TLS acceptor if it is turned on
@@ -98,12 +99,29 @@ pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotarySer
     info!("Listening for TCP traffic at {}", notary_address);
 
     let protocol = Arc::new(Http::new());
-    let notary_globals = NotaryGlobals::new(
-        notary_signing_key,
-        config.notarization.clone(),
-        // Use Arc to prevent cloning the whitelist for every request
-        authorization_whitelist.map(Arc::new),
-    );
+    // let notary_globals = NotaryGlobals::new(
+    //     notary_signing_key,
+    //     config.notarization.clone(),
+    //     // Use Arc to prevent cloning the whitelist for every request
+    //     authorization_whitelist.map(Arc::new),
+    // );
+
+    let notary_globals = match config.notary_key.signing_key_type_name {
+        TLSNSigningKeyTypeNames::MinaSchnorr => NotaryGlobals::new_mina(
+            &config.notary_key,
+            config.notarization.clone(),
+            // Use Arc to prevent cloning the whitelist for every request
+            authorization_whitelist.map(Arc::new),
+        )
+        .await?,
+        TLSNSigningKeyTypeNames::P256 => NotaryGlobals::new_p256(
+            &config.notary_key,
+            config.notarization.clone(),
+            // Use Arc to prevent cloning the whitelist for every request
+            authorization_whitelist.map(Arc::new),
+        )
+        .await?,
+    };
 
     // Parameters needed for the info endpoint
     let public_key = std::fs::read_to_string(&config.notary_key.public_key_pem_path)
@@ -218,14 +236,17 @@ pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotarySer
 //     Ok(notary_signing_key)
 // }
 /// Temporary function to load notary signing key from static file
-async fn load_notary_signing_key(config: &NotarySigningKeyProperties) -> Result<MinaSigningKey> {
+async fn load_notary_signing_key(config: &NotarySigningKeyProperties) -> Result<TLSNSigningKey> {
     debug!("Loading notary server's signing key");
 
-    let notary_signing_key = MinaSigningKey::read_schnorr_pem_file();
-    // let notary_signing_key = MinaSigningKey::read_default_schnorr_pem_file();
+    // let notary_signing_key = SigningKey::read_schnorr_pem_file();
+    let notary_signing_key = match config.signing_key_type_name {
+        TLSNSigningKeyTypeNames::MinaSchnorr => TLSNSigningKey::read_schnorr_pem_file(&config.private_key_pem_path),
+        TLSNSigningKeyTypeNames::P256 => Ok(TLSNSigningKey::read_p256_pem_file(&config.private_key_pem_path).unwrap()),
+    };
 
     debug!("Successfully loaded notary server's signing key!");
-    Ok(notary_signing_key)
+    Ok(notary_signing_key.unwrap())
 }
 
 /// Read a PEM-formatted file and return its buffer reader

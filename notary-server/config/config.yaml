@@ -12,8 +12,9 @@ tls:
   certificate-pem-path: "./fixture/tls/notary.crt"
 
 notary-key:
-  private-key-pem-path: "./fixture/notary/notary.key"
-  public-key-pem-path: "./fixture/notary/notary.pub"
+  signing_key_type_name: "0"
+  private-key-pem-path: "./fixture/notary/schnorr/notary.key"
+  public-key-pem-path: "./fixture/notary/schnorr/notary.pub"
 
 logging:
   level: DEBUG

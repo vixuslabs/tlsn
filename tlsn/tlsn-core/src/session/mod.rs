@@ -12,14 +12,14 @@ pub use header::{SessionHeader, SessionHeaderVerifyError};
 
 use crate::{
     proof::{SessionInfo, SessionProof},
-    signature::Signature,
+    signature::TLSNSignature,
 };
 
 /// A validated notarized session stored by the Prover
 #[derive(Serialize, Deserialize)]
 pub struct NotarizedSession {
     header: SessionHeader,
-    signature: Option<Signature>,
+    signature: Option<TLSNSignature>,
     data: SessionData,
 }
 
@@ -27,7 +27,7 @@ opaque_debug::implement!(NotarizedSession);
 
 impl NotarizedSession {
     /// Create a new notarized session.
-    pub fn new(header: SessionHeader, signature: Option<Signature>, data: SessionData) -> Self {
+    pub fn new(header: SessionHeader, signature: Option<TLSNSignature>, data: SessionData) -> Self {
         Self {
             header,
             signature,
@@ -55,7 +55,7 @@ impl NotarizedSession {
     }
 
     /// Returns the signature for the session header, if the notary signed it
-    pub fn signature(&self) -> &Option<Signature> {
+    pub fn signature(&self) -> &Option<TLSNSignature> {
         &self.signature
     }
 

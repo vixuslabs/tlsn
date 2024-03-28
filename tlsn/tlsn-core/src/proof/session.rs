@@ -12,7 +12,7 @@ use tls_core::{
 
 use crate::{
     session::SessionHeader,
-    signature::{Signature, SignatureVerifyError},
+    signature::{TLSNSignature, SignatureVerifyError},
     HandshakeSummary, NotaryPublicKey, ServerName,
 };
 
@@ -45,7 +45,7 @@ pub struct SessionProof {
     /// The session header
     pub header: SessionHeader,
     /// Signature for the session header, if the notary signed it
-    pub signature: Option<Signature>,
+    pub signature: Option<TLSNSignature>,
     /// Information about the server
     pub session_info: SessionInfo,
 }

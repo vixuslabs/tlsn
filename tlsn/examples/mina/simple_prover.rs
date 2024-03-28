@@ -34,6 +34,7 @@ async fn main() {
         .build()
         .unwrap();
 
+
     // Create a Prover and set it up with the Notary
     // This will set up the MPC backend prior to connecting to the server.
     let prover = Prover::new(config)
@@ -78,6 +79,8 @@ async fn main() {
         .unwrap();
 
     println!("Starting an MPC TLS connection with the server");
+
+    
 
     // Send the request to the Server and get a response via the MPC TLS connection
     let response = request_sender.send_request(request).await.unwrap();
