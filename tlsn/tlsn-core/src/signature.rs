@@ -127,6 +127,9 @@ impl TLSNSignature {
     ) -> Result<(), SignatureVerifyError> {
         match (self, notary_public_key.into()) {
             (Self::MinaSchnorr(sig), NotaryPublicKey::MinaSchnorr(key)) => {
+
+                println!("Inside Self::MinaSchnorr(sig) NotaryPublicKey::MinaSchnorr(key)");
+
                 let mut ctx = mina_signer::create_legacy(());
 
                 let is_valid = ctx.verify(&sig, &key, msg);
@@ -138,26 +141,23 @@ impl TLSNSignature {
                     ))
                 }
             },
-            (Self::P256(sig), NotaryPublicKey::P256(key)) => VerifyingKey::from(key)
+            (Self::P256(sig), NotaryPublicKey::P256(key)) => {
+
+                println!("Inside Self::P256(sig) NotaryPublicKey::P256(key)");
+
+
+                VerifyingKey::from(key)
                 .verify(msg.to_array(), sig)
-                .map_err(|e| SignatureVerifyError(e.to_string())),
-            (Self::MinaSchnorr(_), NotaryPublicKey::P256(_)) => Err(SignatureVerifyError(
-                "3: Invalid public key type for Mina-Schnorr signature".to_string(),
-            )),
+                .map_err(|e| SignatureVerifyError(e.to_string()))
+            },
+            (Self::MinaSchnorr(_), NotaryPublicKey::P256(_)) => {
+
+                Err(SignatureVerifyError(
+                    "3: Invalid public key type for Mina-Schnorr signature".to_string(),
+                ))
+            },
             (Self::P256(sig), NotaryPublicKey::MinaSchnorr(key)) => {
                 
-
-
-                // let mut ctx = mina_signer::create_legacy(());
-
-                // let is_valid = ctx.verify(&sig, &key, msg);
-                // if is_valid {
-                //     Ok(())
-                // } else {
-                //     Err(SignatureVerifyError(
-                //         "Signature verification failed".to_string(),
-                //     ))
-                // }
 
                 println!("self: {:?}", self);
 
@@ -191,18 +191,15 @@ impl<'de> serde::Deserialize<'de> for TLSNSignature {
         let bytes = Vec::<u8>::deserialize(deserializer)?;
 
         // Try to deserialize as MinaSchnorr signature
-        if bytes.len() == 64 {
-            let rx_bytes = &bytes[..32];
-            let s_bytes = &bytes[32..];
-
-            let rx = BaseField::from_bytes(rx_bytes)
-                .map_err(|e| Error::custom(format!("Invalid rx: {}", e)))?;
-            let s = ScalarField::from_bytes(s_bytes)
-                .map_err(|e| Error::custom(format!("Invalid s: {}", e)))?;
-
-            let sig = mina_signer::Signature { rx, s };
-            return Ok(TLSNSignature::MinaSchnorr(sig));
+        let (rx_bytes, s_bytes) = bytes.split_at(32);
+        
+        if let Ok(rx) = BaseField::from_bytes(rx_bytes) {
+            if let Ok(s) = ScalarField::from_bytes(s_bytes) {
+                let sig = mina_signer::Signature { rx, s };
+                return Ok(TLSNSignature::MinaSchnorr(sig));
+            }
         }
+        
 
         // Try to deserialize as P256 signature
         let sig = p256::ecdsa::Signature::from_bytes(GenericArray::from_slice(&bytes))

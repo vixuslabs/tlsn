@@ -5,7 +5,8 @@ use futures::{AsyncRead, AsyncWrite};
 use http_body_util::{BodyExt as _, Either, Empty, Full};
 use hyper::{client::conn::http1::Parts, Request, StatusCode};
 use hyper_util::rt::TokioIo;
-use notary_server::{ClientType, NotarizationSessionRequest, NotarizationSessionResponse};
+use mina_signer::SecKey;
+use notary_server::{ClientType, NotarizationSessionRequest, NotarizationSessionResponse, TLSNSigningKeyTypeNames};
 use rustls::{Certificate, ClientConfig, RootCertStore};
 use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::net::TcpStream;
@@ -17,23 +18,66 @@ use tlsn_core::signature::{Data, TLSNSignature};
 
 use notary_server::TLSNSigningKey;
 
+pub async fn run_notary_full<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
+    conn: T,
+    signing_key_type: TLSNSigningKeyTypeNames,
+) {
+    // Load the notary signing key
+    let signing_key = match signing_key_type {
+        TLSNSigningKeyTypeNames::P256 => {
+            let signing_key_str = std::str::from_utf8(include_bytes!(
+                "../../../notary-server/fixture/notary/notary.key"
+            ))
+            .unwrap();
+            let p256_signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
+
+            TLSNSigningKey::P256(p256_signing_key)
+        }
+        TLSNSigningKeyTypeNames::MinaSchnorr => {
+            let signing_key_str = std::str::from_utf8(
+                include_bytes!("../../../notary-server/fixture/schnorr/notary.key"),
+            )
+            .unwrap();
+
+            println!("signing_key_str: {:?}", signing_key_str);
+
+            let signing_key_schnorr = SecKey::from_base58(signing_key_str).unwrap();
+
+            TLSNSigningKey::MinaSchnorr(signing_key_schnorr)
+
+            // let signing_key = TLSNSigningKey::read_schnorr_pem_file(signing_key_str).unwrap();
+
+            // signing_key
+        }
+    };
+
+    
+
+    // Setup default config. Normally a different ID would be generated
+    // for each notarization.
+    let config = VerifierConfig::builder().id("example").build().unwrap();
+
+    Verifier::new(config)
+        .notarize::<_, TLSNSignature>(conn, &signing_key)
+        .await
+        .unwrap();
+
+}
+
 
 /// Runs a simple Notary with the provided connection to the Prover.
-pub async fn run_notary<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(conn: T) {
+pub async fn run_notary<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
+    conn: T,
+) {
     // Load the notary signing key
-    // let signing_key_str = std::str::from_utf8(include_bytes!(
-    //     "../../../notary-server/fixture/schnorr/notary.key"
-    // ))
-    // .unwrap();
-
-    // let signing_key = TLSNSigningKey::read_schnorr_pem_file(&signing_key_str).unwrap();
 
     let signing_key_str = std::str::from_utf8(include_bytes!(
         "../../../notary-server/fixture/notary/notary.key"
     ))
     .unwrap();
+    let p256_signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
 
-    let signing_key = TLSNSigningKey::read_p256_pem_file(signing_key_str).unwrap();
+    let signing_key = TLSNSigningKey::P256(p256_signing_key);
 
     // Setup default config. Normally a different ID would be generated
     // for each notarization.

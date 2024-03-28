@@ -4,12 +4,13 @@
 use http_body_util::Empty;
 use hyper::{body::Bytes, Request, StatusCode};
 use hyper_util::rt::TokioIo;
-use std::ops::Range;
+use notary_server::TLSNSigningKeyTypeNames;
+use std::{env, ops::Range};
 use tlsn_core::proof::TlsProof;
 use tokio::io::AsyncWriteExt as _;
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 
-use tlsn_examples::run_notary;
+use tlsn_examples::{run_notary, run_notary_full};
 use tlsn_prover::tls::{state::Notarize, Prover, ProverConfig};
 
 // Setting of the application server
@@ -22,10 +23,23 @@ use std::str;
 async fn main() {
     tracing_subscriber::fmt::init();
 
+    let cli_args: Vec<String> = env::args().collect();
+
+    let sig_type = if let Some(sig_type) = cli_args.get(1) {
+        match sig_type.as_str() {
+            "P256" => TLSNSigningKeyTypeNames::P256,
+            "MinaSchnorr" => TLSNSigningKeyTypeNames::MinaSchnorr,
+            // Defaults to P256
+            _ => TLSNSigningKeyTypeNames::P256,
+        }
+    } else {
+        TLSNSigningKeyTypeNames::P256
+    };
+
     let (prover_socket, notary_socket) = tokio::io::duplex(1 << 16);
 
     // Start a local simple notary service
-    tokio::spawn(run_notary(notary_socket.compat()));
+    tokio::spawn(run_notary_full(notary_socket.compat(), sig_type));
 
     // A Prover configuration
     let config = ProverConfig::builder()

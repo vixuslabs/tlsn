@@ -225,16 +225,6 @@ pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotarySer
     }
 }
 
-// /// Temporary function to load notary signing key from static file
-// async fn load_notary_signing_key(config: &NotarySigningKeyProperties) -> Result<SigningKey> {
-//     debug!("Loading notary server's signing key");
-
-//     let notary_signing_key = SigningKey::read_pkcs8_pem_file(&config.private_key_pem_path)
-//         .map_err(|err| eyre!("Failed to load notary signing key for notarization: {err}"))?;
-
-//     debug!("Successfully loaded notary server's signing key!");
-//     Ok(notary_signing_key)
-// }
 /// Temporary function to load notary signing key from static file
 async fn load_notary_signing_key(config: &NotarySigningKeyProperties) -> Result<TLSNSigningKey> {
     debug!("Loading notary server's signing key");

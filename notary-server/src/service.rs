@@ -80,10 +80,7 @@ impl TLSNSigningKey {
 
     pub fn read_p256_pem_file(path: &str) -> Result<Self, eyre::Error> {  
 
-        let signing_key_str = std::fs::read_to_string(DEFAULT_PEM_PATH)
-            .map_err(|err| eyre::eyre!("Failed to read P256 PEM file: {}", err))?;
-
-        let signing_key = p256::ecdsa::SigningKey::read_pkcs8_pem_file(signing_key_str)
+        let signing_key = p256::ecdsa::SigningKey::read_pkcs8_pem_file(path)
             .map_err(|err| eyre::eyre!("Failed to parse P256 PEM file: {}", err))?; 
 
         Ok(Self::P256(signing_key))
