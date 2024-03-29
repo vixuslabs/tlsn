@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{str, sync::Arc};
 
 use elliptic_curve::pkcs8::DecodePrivateKey;
 use futures::{AsyncRead, AsyncWrite};
@@ -14,7 +14,11 @@ use tokio_rustls::TlsConnector;
 use tokio_util::bytes::Bytes;
 use tracing::debug;
 
-use tlsn_core::signature::TLSNSignature;
+use tlsn_core::{signature::TLSNSignature, NotaryPublicKey};
+
+use elliptic_curve::pkcs8::DecodePublicKey;
+use mina_signer::PubKey;
+
 
 use notary_server::TLSNSigningKey;
 
@@ -204,4 +208,40 @@ pub async fn request_notarization(
         notary_tls_socket.into_inner(),
         notarization_response.session_id,
     )
+}
+
+/// Returns the Notary pubkey type from the CLI args, defaults to P256
+pub fn get_notary_pubkey_type(cli_args: Vec<String>) -> TLSNSigningKeyTypeNames {
+    cli_args.get(1)
+        .map(|sig_type| match sig_type.as_str() {
+            "P256" => TLSNSigningKeyTypeNames::P256,
+            "MinaSchnorr" => TLSNSigningKeyTypeNames::MinaSchnorr,
+            _ => TLSNSigningKeyTypeNames::P256,
+        })
+        .unwrap_or(TLSNSigningKeyTypeNames::P256)
+}
+
+/// Returns the Notary pubkey from the fixture, depending on the signature type
+pub fn notary_pubkey_full(signature_type: TLSNSigningKeyTypeNames) -> NotaryPublicKey {
+
+    match signature_type {
+        TLSNSigningKeyTypeNames::P256 => {
+            let pem_file = str::from_utf8(include_bytes!(
+                "../../../notary-server/fixture/notary/notary.pub"
+            ))
+            .unwrap();
+            let pub_key_p256 = p256::PublicKey::from_public_key_pem(pem_file).unwrap();
+
+            NotaryPublicKey::P256(pub_key_p256)
+        }
+        TLSNSigningKeyTypeNames::MinaSchnorr => {
+            let pub_key_str = str::from_utf8(include_bytes!(
+                "../../../notary-server/fixture/schnorr/notary.pub"
+            )).unwrap();
+
+            let pub_key_schnorr = PubKey::from_address(pub_key_str).unwrap();
+
+            NotaryPublicKey::MinaSchnorr(pub_key_schnorr)
+        }
+    }
 }
