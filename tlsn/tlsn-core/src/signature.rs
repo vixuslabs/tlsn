@@ -1,21 +1,22 @@
 //! Signature Mod
 
 use mina_hasher::{Hashable, ROInput};
-use mina_signer::{
-    BaseField, PubKey, ScalarField, Signer
-};
+use mina_signer::{BaseField, PubKey, ScalarField, Signer};
 use o1_utils::FieldHelpers;
 use p256::{
-    ecdsa::{
-        signature::Verifier, 
-        VerifyingKey
-    }, 
-    elliptic_curve::generic_array::GenericArray
+    ecdsa::{signature::Verifier, VerifyingKey},
+    elliptic_curve::generic_array::GenericArray,
 };
 
-use serde::{Serialize, Deserialize};
+use serde::{
+    de::{self, Visitor},
+    Deserializer,
+};
+use serde::{Deserialize, Serialize};
 
+use bitcoin;
 use serde::de::Error;
+use std::fmt;
 
 /// A Notary public key.
 #[derive(Debug, Clone)]
@@ -107,11 +108,8 @@ impl TLSNSignature {
                 bytes.extend_from_slice(&rx_bytes);
                 bytes.extend_from_slice(&s_bytes);
                 bytes
-
-            },
-            Self::P256(sig) => {
-                sig.to_vec()
             }
+            Self::P256(sig) => sig.to_vec(),
         }
     }
 
@@ -126,6 +124,7 @@ impl TLSNSignature {
         msg: &Data,
         notary_public_key: impl Into<NotaryPublicKey>,
     ) -> Result<(), SignatureVerifyError> {
+        println!("msg: {:?}", msg.to_array());
         match (self, notary_public_key.into()) {
             (Self::MinaSchnorr(sig), NotaryPublicKey::MinaSchnorr(key)) => {
                 let mut ctx = mina_signer::create_legacy(());
@@ -157,12 +156,10 @@ impl serde::Serialize for TLSNSignature {
     {
         let bytes = self.to_bytes();
 
-        serializer.serialize_bytes(&bytes)
+        let versioned_data = [vec![154], vec![1], bytes.to_vec()].concat();
+        let b58_str = bitcoin::base58::encode_check(&versioned_data);
 
-        // let (bytes1, bytes2) = self.to_bytes();
-        // let mut bytes = bytes1;
-        // bytes.extend(bytes2);
-        // serializer.serialize_bytes(&bytes)
+        serializer.serialize_str(&b58_str)
     }
 }
 
@@ -171,23 +168,49 @@ impl<'de> serde::Deserialize<'de> for TLSNSignature {
     where
         D: serde::Deserializer<'de>,
     {
+        struct TLSNSignatureVisitor;
 
-        let bytes = Vec::<u8>::deserialize(deserializer)?;
+        impl<'de> Visitor<'de> for TLSNSignatureVisitor {
+            type Value = TLSNSignature;
 
-        // Try to deserialize as MinaSchnorr signature
-        let (rx_bytes, s_bytes) = bytes.split_at(32);
-        
-        if let Ok(rx) = BaseField::from_bytes(rx_bytes) {
-            if let Ok(s) = ScalarField::from_bytes(s_bytes) {
-                let sig = mina_signer::Signature { rx, s };
-                return Ok(TLSNSignature::MinaSchnorr(sig));
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a string encoded in Base58")
+            }
+
+            fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+            where
+                E: de::Error,
+            {
+                let data = bitcoin::base58::decode_check(v).map_err(E::custom)?;
+
+                // Validate version byte
+                if data[0] != 154 {
+                    return Err(E::custom("Invalid version byte"));
+                }
+
+                let bytes = &data[2..];
+
+                // The rest of the deserialization logic remains the same
+                let (rx_bytes, s_bytes) = bytes.split_at(32);
+
+                if let Ok(rx) = BaseField::from_bytes(rx_bytes) {
+                    if let Ok(s) = ScalarField::from_bytes(s_bytes) {
+                        println!(
+                            "rx: {:?}, s: {:?}",
+                            rx.to_bigint_positive(),
+                            s.to_bigint_positive()
+                        );
+                        let sig = mina_signer::Signature { rx, s };
+                        return Ok(TLSNSignature::MinaSchnorr(sig));
+                    }
+                }
+
+                let sig = p256::ecdsa::Signature::from_bytes(GenericArray::from_slice(bytes))
+                    .map_err(|e| E::custom(format!("Invalid P256 signature: {}", e)))?;
+                Ok(TLSNSignature::P256(sig))
             }
         }
-        
 
-        // Try to deserialize as P256 signature
-        let sig = p256::ecdsa::Signature::from_bytes(GenericArray::from_slice(&bytes))
-            .map_err(|e| Error::custom(format!("Invalid P256 signature: {}", e)))?;
-        Ok(TLSNSignature::P256(sig))
+        deserializer.deserialize_str(TLSNSignatureVisitor)
     }
 }
