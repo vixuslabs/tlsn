@@ -13,6 +13,8 @@ use p256::{
     elliptic_curve::generic_array::GenericArray
 };
 
+use serde::{Serialize, Deserialize};
+
 use serde::de::Error;
 
 /// A Notary public key.
@@ -94,13 +96,21 @@ impl Hashable for Data {
 
 impl TLSNSignature {
     /// Returns the bytes of this signature.
-    pub fn to_bytes(&self) -> (Vec<u8>, Vec<u8>) {
+    pub fn to_bytes(&self) -> Vec<u8> {
         match self {
-            Self::MinaSchnorr(sig) => (sig.rx.to_bytes(), sig.s.to_bytes()),
+            Self::MinaSchnorr(sig) => {
+                let mut bytes = Vec::with_capacity(BaseField::size_in_bytes() * 2);
+
+                let rx_bytes = sig.rx.to_bytes();
+                let s_bytes = sig.s.to_bytes();
+
+                bytes.extend_from_slice(&rx_bytes);
+                bytes.extend_from_slice(&s_bytes);
+                bytes
+
+            },
             Self::P256(sig) => {
-                let bytes = sig.to_bytes();
-                let mid = bytes.len() / 2;
-                (bytes[..mid].to_vec(), bytes[mid..].to_vec())
+                sig.to_vec()
             }
         }
     }
@@ -145,10 +155,14 @@ impl serde::Serialize for TLSNSignature {
     where
         S: serde::Serializer,
     {
-        let (bytes1, bytes2) = self.to_bytes();
-        let mut bytes = bytes1;
-        bytes.extend(bytes2);
+        let bytes = self.to_bytes();
+
         serializer.serialize_bytes(&bytes)
+
+        // let (bytes1, bytes2) = self.to_bytes();
+        // let mut bytes = bytes1;
+        // bytes.extend(bytes2);
+        // serializer.serialize_bytes(&bytes)
     }
 }
 
