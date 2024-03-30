@@ -127,7 +127,7 @@ impl TLSNSignature {
         println!("msg: {:?}", msg.to_array());
         match (self, notary_public_key.into()) {
             (Self::MinaSchnorr(sig), NotaryPublicKey::MinaSchnorr(key)) => {
-                let mut ctx = mina_signer::create_legacy(());
+                let mut ctx = mina_signer::create_kimchi(());
                 if ctx.verify(&sig, &key, msg) {
                     Ok(())
                 } else {
@@ -197,8 +197,8 @@ impl<'de> serde::Deserialize<'de> for TLSNSignature {
                     if let Ok(s) = ScalarField::from_bytes(s_bytes) {
                         println!(
                             "rx: {:?}, s: {:?}",
-                            rx.to_bigint_positive(),
-                            s.to_bigint_positive()
+                            rx.to_biguint(),
+                            s.to_biguint()
                         );
                         let sig = mina_signer::Signature { rx, s };
                         return Ok(TLSNSignature::MinaSchnorr(sig));

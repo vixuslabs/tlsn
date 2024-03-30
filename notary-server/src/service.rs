@@ -99,7 +99,7 @@ impl Signer<tlsn_core::TLSNSignature> for TLSNSigningKey {
     fn try_sign(&self, msg: &[u8]) -> Result<tlsn_core::TLSNSignature, signature::Error> {
         match self {
             TLSNSigningKey::MinaSchnorr(sk) => {
-                let mut ctx = mina_signer::create_legacy::<tlsn_core::signature::Data>(());
+                let mut ctx = mina_signer::create_kimchi::<tlsn_core::signature::Data>(());
                 let key_pair = Keypair::from_secret_key(sk.clone())
                     .map_err(|_| signature::Error::new())?;
                 let sig = ctx.sign(&key_pair, &Data::from(msg));
