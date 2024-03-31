@@ -1,7 +1,7 @@
 //! Signature Mod
 
 use mina_hasher::{Hashable, ROInput};
-use mina_signer::{BaseField, PubKey, ScalarField, Signer};
+use mina_signer::{BaseField, PubKey, ScalarField, Signer, NetworkId, Schnorr};
 use o1_utils::FieldHelpers;
 use p256::{
     ecdsa::{signature::Verifier, VerifyingKey},
@@ -15,8 +15,12 @@ use serde::{
 use serde::{Deserialize, Serialize};
 
 use bitcoin;
+use bitcoin::base58;
 use serde::de::Error;
 use std::fmt;
+
+use crate::SessionHeader;
+use mpz_core::serialize::CanonicalSerialize;
 
 /// A Notary public key.
 #[derive(Debug, Clone)]
@@ -68,8 +72,32 @@ impl From<p256::ecdsa::Signature> for TLSNSignature {
 }
 
 /// Data Struct
-#[derive(Clone)]
-pub struct Data(pub Vec<u8>);
+#[derive(Debug, Clone)]
+pub struct Data(pub &'static [u8]);
+// #[derive(Debug, Clone)]
+// pub struct Data(pub Vec<u8>);
+
+impl Hashable for SessionHeader {
+    type D = NetworkId;
+
+    fn to_roinput(&self) -> ROInput {
+        let roi = ROInput::new()
+            .append_bytes(&self.encoder_seed)
+            .append_bytes(&self.merkle_root.0)
+            .append_u64(self.sent_len as u64)
+            .append_u64(self.recv_len as u64)
+            .append_bytes(&self.handshake_summary.to_bytes());
+
+        roi
+        
+    }
+
+    fn domain_string(_: Self::D) -> Option<String> {
+        None
+    }
+
+}
+
 
 impl Data {
     /// to_array method
@@ -77,17 +105,33 @@ impl Data {
         &self.0
     }
 
+    /// Converts the data to a Base58-encoded string.
+    pub fn to_base58(&self) -> String {
+        base58::encode(&self.0)
+    }
+
     /// from method
     pub fn from(data: &[u8]) -> Self {
-        Self(data.to_vec())
+        let data_static: &'static [u8] = Box::leak(data.to_vec().into_boxed_slice());
+        Self(data_static)
+    }
+}
+
+impl From<Vec<u8>> for Data {
+    fn from(data: Vec<u8>) -> Self {
+        let data_static: &'static [u8] = Box::leak(data.into_boxed_slice());
+        Self(data_static)
     }
 }
 
 impl Hashable for Data {
-    type D = ();
+    type D = NetworkId;
 
     fn to_roinput(&self) -> ROInput {
         ROInput::new().append_bytes(&self.0)
+        // let roi = ROInput::new();
+
+        // roi
     }
 
     fn domain_string(_: Self::D) -> Option<String> {
@@ -121,13 +165,17 @@ impl TLSNSignature {
     /// * `notary_public_key` - The public key of the notary.
     pub fn verify(
         &self,
-        msg: &Data,
+        msg: &SessionHeader,
         notary_public_key: impl Into<NotaryPublicKey>,
     ) -> Result<(), SignatureVerifyError> {
-        println!("msg: {:?}", msg.to_array());
+        println!("msg: {:?}", msg);
+        // println!("msg.to_array: {:?}", msg.to_array());
+        // println!("msg.to_base58: {:?}", msg.to_base58());
         match (self, notary_public_key.into()) {
             (Self::MinaSchnorr(sig), NotaryPublicKey::MinaSchnorr(key)) => {
-                let mut ctx = mina_signer::create_kimchi(());
+
+                let mut ctx = mina_signer::create_legacy::<SessionHeader>(NetworkId::TESTNET);
+
                 if ctx.verify(&sig, &key, msg) {
                     Ok(())
                 } else {
@@ -137,7 +185,7 @@ impl TLSNSignature {
                 }
             }
             (Self::P256(sig), NotaryPublicKey::P256(key)) => VerifyingKey::from(key)
-                .verify(msg.to_array(), sig)
+                .verify(msg.to_bytes(), sig)
                 .map_err(|e| SignatureVerifyError(e.to_string())),
             (Self::MinaSchnorr(_), NotaryPublicKey::P256(_)) => Err(SignatureVerifyError(
                 "Invalid public key type for Mina-Schnorr signature".to_string(),

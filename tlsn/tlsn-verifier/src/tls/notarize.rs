@@ -75,7 +75,7 @@ impl Verifier<Notarize> {
                 handshake_summary,
             );
 
-            let signature = signer.sign(&session_header.to_bytes().to_array());
+            let signature = signer.sign(&session_header.to_bytes());
 
             #[cfg(feature = "tracing")]
             info!("Signed session header");
