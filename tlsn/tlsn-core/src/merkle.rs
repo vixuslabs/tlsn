@@ -20,7 +20,7 @@ use utils::iter::DuplicateCheck;
 
 /// A Merkle root.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub struct MerkleRoot([u8; 32]);
+pub struct MerkleRoot(pub [u8; 32]);
 
 impl MerkleRoot {
     /// Returns the inner byte array
