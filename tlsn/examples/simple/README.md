@@ -1,12 +1,18 @@
 ## Simple Example: Notarize Public Data from example.com (Rust) <a name="rust-simple"></a>
 
 This example demonstrates the simplest possible use case for TLSNotary:
+
 1. Notarize: Fetch <https://example.com/> and create a proof of its content.
 2. Verify the proof.
 
 Next, we will redact the content and verify it again:
+
 1. Redact the `USER_AGENT` and titles.
 2. Verify the redacted proof.
+
+#### Note:
+
+1. This example is a modified version of the original [simple example](https://github.com/tlsnotary/tlsn/tree/main/tlsn/examples/simple). We have added to ability to use the MinaSchnorr Signature Scheme. The see how follow along below.
 
 ### 1. Notarize <https://example.com/>
 
@@ -14,6 +20,12 @@ Run a simple prover:
 
 ```shell
 cargo run --release --example simple_prover
+```
+
+To run the simple prover with the MinaSchnorr Signature Scheme, use:
+
+```shell
+cargo run --release --example simple_prover -- MinaSchnorr
 ```
 
 If the notarization was successful, you should see this output in the console:
@@ -33,6 +45,12 @@ When you open `simple_proof.json` in an editor, you will see a JSON file with lo
 
 ```shell
 cargo run --release --example simple_verifier
+```
+
+To run the simple verifier with the MinaSchnorr Signature Scheme, use:
+
+```shell
+cargo run --release --example simple_verifier -- MinaSchnorr
 ```
 
 This will output the TLS-transaction in clear text:
@@ -86,5 +104,3 @@ Feel free to try these extra challenges:
 ### Next steps
 
 Try out the [Discord example](../Discord/README.md) and notarize a Discord conversations.
-
-
