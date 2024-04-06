@@ -68,7 +68,7 @@ impl SessionProof {
             .as_ref()
             .ok_or(SessionProofError::MissingNotarySignature)?;
 
-        signature.verify(&self.header.to_bytes(), notary_public_key)?;
+        signature.verify(&self.header.to_data(), notary_public_key)?;
         self.session_info
             .verify(self.header.handshake_summary(), cert_verifier)?;
 

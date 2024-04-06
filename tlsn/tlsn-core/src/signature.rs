@@ -1,7 +1,7 @@
 //! Signature Mod
 
 use mina_hasher::{Hashable, ROInput};
-use mina_signer::{BaseField, PubKey, ScalarField, Signer};
+use mina_signer::{BaseField, PubKey, ScalarField, Signer, NetworkId};
 use o1_utils::FieldHelpers;
 use p256::{
     ecdsa::{signature::Verifier, VerifyingKey},
@@ -69,29 +69,55 @@ impl From<p256::ecdsa::Signature> for TLSNSignature {
 
 /// Data Struct
 #[derive(Clone)]
-pub struct Data(pub Vec<u8>);
+pub enum Data {
+    /// Mina data
+    Mina(Vec<BaseField>),
+    /// P256 data
+    P256(Vec<u8>),
+}
 
 impl Data {
-    /// to_array method
+    /// Returns a reference to the byte array if the data is of the P256 variant.
     pub fn to_array(&self) -> &[u8] {
-        &self.0
+        match self {
+            Data::P256(data) => data,
+            Data::Mina(_) => panic!("to_array is not applicable for Mina variant"),
+        }
     }
 
-    /// from method
+    /// Returns the data as a byte array.
     pub fn from(data: &[u8]) -> Self {
-        Self(data.to_vec())
+        let mina_data: Vec<BaseField> = data.iter()
+            .map(|&byte| BaseField::from(byte))
+            .collect();
+
+        Data::Mina(mina_data)
     }
 }
 
 impl Hashable for Data {
-    type D = ();
+    type D = NetworkId;
 
     fn to_roinput(&self) -> ROInput {
-        ROInput::new().append_bytes(&self.0)
+        match self {
+            Data::Mina(fields) => {
+                let mut ro_input = ROInput::new();
+
+                for field in fields {
+                    ro_input = ro_input.append_field(*field);
+                }
+
+                ro_input
+            }
+            Data::P256(_) => panic!("to_roinput is not applicable for P256 variant"),
+        }
     }
 
-    fn domain_string(_: Self::D) -> Option<String> {
-        None
+    fn domain_string(network_id: NetworkId) -> Option<String> {
+        match network_id {
+            NetworkId::MAINNET => "MinaSignatureMainnet".to_string().into(),
+            NetworkId::TESTNET => "CodaSignature".to_string().into(),
+        }
     }
 }
 
@@ -124,10 +150,9 @@ impl TLSNSignature {
         msg: &Data,
         notary_public_key: impl Into<NotaryPublicKey>,
     ) -> Result<(), SignatureVerifyError> {
-        println!("msg: {:?}", msg.to_array());
         match (self, notary_public_key.into()) {
             (Self::MinaSchnorr(sig), NotaryPublicKey::MinaSchnorr(key)) => {
-                let mut ctx = mina_signer::create_kimchi(());
+                let mut ctx = mina_signer::create_kimchi(NetworkId::TESTNET);
                 if ctx.verify(&sig, &key, msg) {
                     Ok(())
                 } else {

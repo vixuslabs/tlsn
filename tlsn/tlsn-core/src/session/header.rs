@@ -42,22 +42,10 @@ pub struct SessionHeader {
 
 impl SessionHeader {
     /// Serialize the session header to bytes
-    pub fn to_bytes(&self) -> &[u8] {
-        let bytes: &[u8] = Box::leak(bcs::to_bytes(self).unwrap().into_boxed_slice());
-
-        bytes
-
-        // Box::leak(bytes.to_vec().into_boxed_slice()).as_ref()
-
-        // bytes.as_ref()
+    pub fn to_data(&self) -> Data {
+        let bytes = bcs::to_bytes(self).expect("serialization should not fail");
+        Data::from(&bytes)
     }
-
-    // pub fn to_bytes(&self) -> Data {
-    //     let bytes = bcs::to_bytes(self).expect("serialization should not fail");
-
-    //     Data::from(&bytes)
-    //     // Data(&bytes[..])
-    // }
 
     /// Create a new instance of SessionHeader
     pub fn new(
