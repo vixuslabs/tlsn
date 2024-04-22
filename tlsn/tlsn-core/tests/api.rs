@@ -10,6 +10,7 @@ use p256::{
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 
+use signature::Keypair;
 use tls_core::{
     cert::ServerCertDetails,
     handshake::HandshakeData,
@@ -24,7 +25,8 @@ use tlsn_core::{
     fixtures,
     msg::SignedSessionHeader,
     proof::{SessionProof, SubstringsProof},
-    HandshakeSummary, NotarizedSession, ServerName, SessionData, SessionHeader, Signature,
+    signature::{TLSNSigningKey, TLSNSigningKeyTypeNames},
+    HandshakeSummary, NotarizedSession, ServerName, SessionData, SessionHeader, TLSNSignature,
     Transcript,
 };
 
@@ -37,7 +39,6 @@ fn test_api() {
     let data_recv = "received data".as_bytes();
     let transcript_tx = Transcript::new(data_sent.to_vec());
     let transcript_rx = Transcript::new(data_recv.to_vec());
-
     // Ranges of plaintext for which the Prover wants to create a commitment
     let range1: Range<usize> = Range { start: 0, end: 2 };
     let range2: Range<usize> = Range { start: 1, end: 3 };
@@ -97,42 +98,48 @@ fn test_api() {
     let raw_key = signing_key.to_bytes();
 
     // Notary receives the raw signing key from some outer context
-    let mut signer = SigningKey::from_bytes(&raw_key).unwrap();
-    let notary_pubkey = PublicKey::from(*signer.verifying_key());
-    let notary_verifing_key = *signer.verifying_key();
+    let mut signer = TLSNSigningKey::from_bytes(&raw_key, TLSNSigningKeyTypeNames::P256).unwrap();
 
-    // Notary creates the session header
-    assert!(data_sent.len() <= (u32::MAX as usize) && data_recv.len() <= (u32::MAX as usize));
 
-    let header = SessionHeader::new(
-        fixtures::encoder_seed(),
-        notarized_session_data.commitments().merkle_root(),
-        data_sent.len(),
-        data_recv.len(),
-        // the session's end time and TLS handshake start time may be a few mins apart
-        HandshakeSummary::new(time + 60, ephem_key.clone(), hs_commitment),
-    );
 
-    let signature: P256Signature = signer.sign(&header.to_bytes().to_array());
-    // Notary creates a msg and sends it to Prover
-    let msg = SignedSessionHeader {
-        header,
-        signature: signature.into(),
-    };
+    if let TLSNSigningKey::P256(ref mut key) = signer {
+        let notary_publickey = PublicKey::from(key.verifying_key());
 
-    //---------------------------------------
-    let msg_bytes = bincode::serialize(&msg).unwrap();
-    let SignedSessionHeader { header, signature } = bincode::deserialize(&msg_bytes).unwrap();
-    //---------------------------------------
+        let notary_pubkey = PublicKey::from(key.verifying_key());
 
-    // Prover verifies the signature
+        let notary_verifing_key = *key.verifying_key();
+
+        assert!(data_sent.len() <= (u32::MAX as usize) && data_recv.len() <= (u32::MAX as usize));
+
+        let header = SessionHeader::new(
+            fixtures::encoder_seed(),
+            notarized_session_data.commitments().merkle_root(),
+            data_sent.len(),
+            data_recv.len(),
+            // the session's end time and TLS handshake start time may be a few mins apart
+            HandshakeSummary::new(time + 60, ephem_key.clone(), hs_commitment),
+        );
+    
+        let signature: TLSNSignature = signer.sign(&header.to_bytes());
+        // Notary creates a msg and sends it to Prover
+        let msg = SignedSessionHeader {
+            header,
+            signature: signature.into(),
+        };
+    
+        //---------------------------------------
+        let msg_bytes = bincode::serialize(&msg).unwrap();
+        let SignedSessionHeader { header, signature } = bincode::deserialize(&msg_bytes).unwrap();
+        //---------------------------------------
+
+            // Prover verifies the signature
     #[allow(irrefutable_let_patterns)]
-    if let Signature::P256(signature) = signature {
+    if let TLSNSignature::P256(signature) = signature {
         notary_verifing_key
             .verify(&header.to_bytes(), &signature)
             .unwrap();
     } else {
-        panic!("Notary signature is not P256");
+        panic!("Notary TLSNSignature signature is not P256");
     };
 
     // Prover verifies the header and stores it with the signature in NotarizedSession
@@ -189,4 +196,8 @@ fn test_api() {
 
     assert_eq!(&sent.data()[range1], b"se".as_slice());
     assert_eq!(&recv.data()[range2], b"ec".as_slice());
+        
+    } else {
+        panic!("Notary TLSNSigningKey is not P256");
+    }
 }

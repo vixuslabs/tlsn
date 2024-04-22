@@ -12,10 +12,7 @@ use axum_macros::debug_handler;
 use base64::Engine;
 use chrono::Utc;
 use mina_signer::{
-    keypair::Keypair,
-    SecKey, Signer as MinaSigner,
-    Signature as MinaSignature,
-    NetworkId,
+    keypair::Keypair, NetworkId, SecKey, Signature as MinaSignature, Signer as MinaSigner,
 };
 use sha1::digest::generic_array::GenericArray;
 use tlsn_core::signature::{Data, TLSNSignature};
@@ -40,7 +37,7 @@ use crate::{
         websocket::websocket_notarize,
     },
 };
-use signature::{Error, Signer};
+use signature::Signer;
 
 #[derive(Clone, Debug)]
 pub enum TLSNSigningKey {
@@ -60,35 +57,33 @@ impl From<p256::ecdsa::SigningKey> for TLSNSigningKey {
     }
 }
 
-
 impl TLSNSigningKey {
     pub fn read_default_schnorr_pem_file() -> Self {
         Self::MinaSchnorr(SecKey::from_bytes(&[0u8; 32]).unwrap())
     }
 
     pub fn read_schnorr_pem_file(path: &str) -> Result<Self, ()> {
-        Ok(Self::MinaSchnorr(SecKey::from_base58("EKFSmntAEAPm5CnYMsVpfSEuyNfbXfxy2vHW8HPxGyPPgm5xyRtN").unwrap()))
+        Ok(Self::MinaSchnorr(
+            SecKey::from_base58("EKFSmntAEAPm5CnYMsVpfSEuyNfbXfxy2vHW8HPxGyPPgm5xyRtN").unwrap(),
+        ))
         // println!("path: {:?}", path);
         // Ok(Self::MinaSchnorr(SecKey::from_base58(path).unwrap()))
     }
 
-    pub fn read_p256_pem_file(path: &str) -> Result<Self, eyre::Error> {  
-
+    pub fn read_p256_pem_file(path: &str) -> Result<Self, eyre::Error> {
         let signing_key = p256::ecdsa::SigningKey::read_pkcs8_pem_file(path)
-            .map_err(|err| eyre::eyre!("Failed to parse P256 PEM file: {}", err))?; 
+            .map_err(|err| eyre::eyre!("Failed to parse P256 PEM file: {}", err))?;
 
         Ok(Self::P256(signing_key))
 
         // let signing_key_str = std::fs::read_to_string(DEFAULT_PEM_PATH)
         // .map_err(|_| ())?;
-        
 
         // Ok(Self::P256(p256::ecdsa::SigningKey::read_pkcs8_pem_file(signing_key_str).unwrap()))
-    
+
         // Ok(Self::P256(p256::ecdsa::SigningKey::read_pkcs8_pem_file(path).unwrap()))
     }
 }
-
 
 /// Sign the provided message bytestring using `Self` (e.g. a cryptographic key
 /// or connection to an HSM), returning a digital signature.
@@ -100,10 +95,11 @@ impl Signer<tlsn_core::TLSNSignature> for TLSNSigningKey {
     fn try_sign(&self, msg: &[u8]) -> Result<tlsn_core::TLSNSignature, signature::Error> {
         match self {
             TLSNSigningKey::MinaSchnorr(sk) => {
-                let mut ctx = mina_signer::create_kimchi::<tlsn_core::signature::Data>(NetworkId::TESTNET);
-                let key_pair = Keypair::from_secret_key(sk.clone())
-                    .map_err(|_| signature::Error::new())?;
-                let sig = ctx.sign(&key_pair, &Data::from(msg));
+                let mut ctx =
+                    mina_signer::create_kimchi::<tlsn_core::signature::Data>(NetworkId::TESTNET);
+                let key_pair =
+                    Keypair::from_secret_key(sk.clone()).map_err(|_| signature::Error::new())?;
+                let sig = ctx.sign(&key_pair, &Data::to_base_field(msg));
                 Ok(TLSNSignature::MinaSchnorr(sig))
             }
             TLSNSigningKey::P256(sk) => {

@@ -1,13 +1,16 @@
 //! Signature Mod
 
 use mina_hasher::{Hashable, ROInput};
-use mina_signer::{BaseField, PubKey, ScalarField, Signer, NetworkId};
+use mina_signer::{
+    keypair::Keypair, NetworkId, SecKey, Signature as MinaSignature, Signer as MinaSigner,
+};
+use mina_signer::{BaseField, PubKey, ScalarField};
 use o1_utils::FieldHelpers;
 use p256::{
     ecdsa::{signature::Verifier, VerifyingKey},
     elliptic_curve::generic_array::GenericArray,
+    pkcs8::DecodePrivateKey,
 };
-
 use serde::{
     de::{self, Visitor},
     Deserializer,
@@ -17,6 +20,8 @@ use serde::{Deserialize, Serialize};
 use bitcoin;
 use serde::de::Error;
 use std::fmt;
+
+use signature::Signer;
 
 /// A Notary public key.
 #[derive(Debug, Clone)]
@@ -68,7 +73,7 @@ impl From<p256::ecdsa::Signature> for TLSNSignature {
 }
 
 /// Data Struct
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Data {
     /// Mina data
     Mina(Vec<BaseField>),
@@ -81,15 +86,16 @@ impl Data {
     pub fn to_array(&self) -> &[u8] {
         match self {
             Data::P256(data) => data,
-            Data::Mina(_) => panic!("to_array is not applicable for Mina variant"),
+            Data::Mina(data) => {
+
+                panic!("to_array is not applicable for Mina variant")
+            },
         }
     }
 
-    /// Returns the data as a byte array.
-    pub fn from(data: &[u8]) -> Self {
-        let mina_data: Vec<BaseField> = data.iter()
-            .map(|&byte| BaseField::from(byte))
-            .collect();
+    /// Converts a byte array to a Mina data variant.
+    pub fn to_base_field(data: &[u8]) -> Self {
+        let mina_data: Vec<BaseField> = data.iter().map(|&byte| BaseField::from(byte)).collect();
 
         Data::Mina(mina_data)
     }
@@ -152,6 +158,9 @@ impl TLSNSignature {
     ) -> Result<(), SignatureVerifyError> {
         match (self, notary_public_key.into()) {
             (Self::MinaSchnorr(sig), NotaryPublicKey::MinaSchnorr(key)) => {
+
+                println!("MinaSchnorr - msg: {:?}", msg);
+
                 let mut ctx = mina_signer::create_kimchi(NetworkId::TESTNET);
                 if ctx.verify(&sig, &key, msg) {
                     Ok(())
@@ -161,9 +170,13 @@ impl TLSNSignature {
                     ))
                 }
             }
-            (Self::P256(sig), NotaryPublicKey::P256(key)) => VerifyingKey::from(key)
+            (Self::P256(sig), NotaryPublicKey::P256(key)) => {
+                println!(" P256 - msg: {:?}", msg);
+
+                VerifyingKey::from(key)
                 .verify(msg.to_array(), sig)
-                .map_err(|e| SignatureVerifyError(e.to_string())),
+                .map_err(|e| SignatureVerifyError(e.to_string()))
+            },
             (Self::MinaSchnorr(_), NotaryPublicKey::P256(_)) => Err(SignatureVerifyError(
                 "Invalid public key type for Mina-Schnorr signature".to_string(),
             )),
@@ -220,11 +233,7 @@ impl<'de> serde::Deserialize<'de> for TLSNSignature {
 
                 if let Ok(rx) = BaseField::from_bytes(rx_bytes) {
                     if let Ok(s) = ScalarField::from_bytes(s_bytes) {
-                        println!(
-                            "rx: {:?}, s: {:?}",
-                            rx.to_biguint(),
-                            s.to_biguint()
-                        );
+                        println!("rx: {:?}, s: {:?}", rx.to_biguint(), s.to_biguint());
                         let sig = mina_signer::Signature { rx, s };
                         return Ok(TLSNSignature::MinaSchnorr(sig));
                     }
@@ -237,5 +246,96 @@ impl<'de> serde::Deserialize<'de> for TLSNSignature {
         }
 
         deserializer.deserialize_str(TLSNSignatureVisitor)
+    }
+}
+
+/// Signing key type names.
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TLSNSigningKeyTypeNames {
+    /// Mina Schnorr key.
+    MinaSchnorr,
+    /// P256 key.
+    P256,
+}
+
+/// A Signing Key which can be either a Mina Schnorr key or a P256 key.
+#[derive(Clone, Debug)]
+pub enum TLSNSigningKey {
+    /// A Mina Schnorr signing key.
+    MinaSchnorr(SecKey),
+    /// A P256 signing key.
+    P256(p256::ecdsa::SigningKey),
+}
+
+impl From<mina_signer::seckey::SecKey> for TLSNSigningKey {
+    fn from(key: SecKey) -> Self {
+        Self::MinaSchnorr(key)
+    }
+}
+
+impl From<p256::ecdsa::SigningKey> for TLSNSigningKey {
+    fn from(key: p256::ecdsa::SigningKey) -> Self {
+        Self::P256(key)
+    }
+}
+
+impl TLSNSigningKey {
+    /// Reads a randomly generated Mina Schnorr key.
+    pub fn read_default_schnorr_pem_file() -> Self {
+        Self::MinaSchnorr(SecKey::from_bytes(&[0u8; 32]).unwrap())
+    }
+
+    /// Reads a Mina Schnorr key from a PEM file.
+    pub fn read_schnorr_pem_file(path: &str) -> Result<Self, ()> {
+        Ok(Self::MinaSchnorr(
+            SecKey::from_base58("EKFSmntAEAPm5CnYMsVpfSEuyNfbXfxy2vHW8HPxGyPPgm5xyRtN").unwrap(),
+        ))
+    }
+
+    /// Reads a P256 key from a PEM file.
+    pub fn read_p256_pem_file(path: &str) -> Result<Self, eyre::Error> {
+        let signing_key = p256::ecdsa::SigningKey::read_pkcs8_pem_file(path)
+            .map_err(|err| eyre::eyre!("Failed to parse P256 PEM file: {}", err))?;
+
+        Ok(Self::P256(signing_key))
+
+        // let signing_key_str = std::fs::read_to_string(DEFAULT_PEM_PATH)
+        // .map_err(|_| ())?;
+
+        // Ok(Self::P256(p256::ecdsa::SigningKey::read_pkcs8_pem_file(signing_key_str).unwrap()))
+
+        // Ok(Self::P256(p256::ecdsa::SigningKey::read_pkcs8_pem_file(path).unwrap()))
+    }
+
+    /// Returns a TLSNSigningKey from a byte array.
+    pub fn from_bytes(bytes: &[u8], to: TLSNSigningKeyTypeNames) -> Result<Self, ()> {
+        let key = p256::ecdsa::SigningKey::from_bytes(bytes.into()).unwrap();
+
+        Ok(Self::P256(key))
+    }
+}
+
+/// Sign the provided message bytestring using `Self` (e.g. a cryptographic key
+/// or connection to an HSM), returning a digital signature.
+impl Signer<TLSNSignature> for TLSNSigningKey {
+    fn sign(&self, msg: &[u8]) -> TLSNSignature {
+        self.try_sign(msg).expect("signature operation failed")
+    }
+
+    fn try_sign(&self, msg: &[u8]) -> Result<TLSNSignature, signature::Error> {
+        match self {
+            TLSNSigningKey::MinaSchnorr(sk) => {
+                let mut ctx = mina_signer::create_kimchi::<Data>(NetworkId::TESTNET);
+                let key_pair =
+                    Keypair::from_secret_key(sk.clone()).map_err(|_| signature::Error::new())?;
+                let sig = ctx.sign(&key_pair, &Data::to_base_field(msg));
+                Ok(TLSNSignature::MinaSchnorr(sig))
+            }
+            TLSNSigningKey::P256(sk) => {
+                let sig = sk.try_sign(msg)?;
+                Ok(TLSNSignature::P256(sig))
+            }
+        }
     }
 }

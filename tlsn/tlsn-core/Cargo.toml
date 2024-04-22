@@ -39,6 +39,8 @@ mina-hasher = { git = "https://github.com/o1-labs/proof-systems" }
 o1-utils = { git = "https://github.com/o1-labs/proof-systems" }
 bcs = "0.1.6"
 bitcoin = "0.31.1"
+eyre = "0.6.8"
+signature = "2.2.0"
 
 
 [dev-dependencies]
