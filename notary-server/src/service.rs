@@ -37,7 +37,7 @@ use crate::{
         websocket::websocket_notarize,
     },
 };
-use signature::{Error, Signer};
+use signature::Signer;
 
 #[derive(Clone, Debug)]
 pub enum TLSNSigningKey {
@@ -99,7 +99,7 @@ impl Signer<tlsn_core::TLSNSignature> for TLSNSigningKey {
                     mina_signer::create_kimchi::<tlsn_core::signature::Data>(NetworkId::TESTNET);
                 let key_pair =
                     Keypair::from_secret_key(sk.clone()).map_err(|_| signature::Error::new())?;
-                let sig = ctx.sign(&key_pair, &Data::from(msg));
+                let sig = ctx.sign(&key_pair, &Data::to_base_field(msg));
                 Ok(TLSNSignature::MinaSchnorr(MinaSchnorrSignature(sig)))
             }
             TLSNSigningKey::P256(sk) => {

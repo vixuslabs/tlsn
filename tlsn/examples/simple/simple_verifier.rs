@@ -14,11 +14,26 @@ use tlsn_examples::{get_notary_pubkey_type, notary_pubkey_full};
 fn main() {
     let cli_args: Vec<String> = env::args().collect();
 
+    // let sig_type = if let Some(sig_type) = cli_args.get(1) {
+    //     match sig_type.as_str() {
+    //         "P256" => TLSNSigningKeyTypeNames::P256,
+    //         "MinaSchnorr" => TLSNSigningKeyTypeNames::MinaSchnorr,
+    //         // Defaults to P256
+    //         _ => TLSNSigningKeyTypeNames::P256,
+    //     }
+    // } else {
+    //     TLSNSigningKeyTypeNames::P256
+    // };
+
     let sig_type = get_notary_pubkey_type(cli_args);
+
+    println!("Verifying proof with {:?}", sig_type);
 
     // Deserialize the proof
     let proof = std::fs::read_to_string("simple_proof.json").unwrap();
     let proof: TlsProof = serde_json::from_str(proof.as_str()).unwrap();
+
+    println!("Proof deserialized successfully.");
 
     let TlsProof {
         // The session proof establishes the identity of the server and the commitments
@@ -38,6 +53,8 @@ fn main() {
         .verify_with_default_cert_verifier(notary_pubkey_full(sig_type))
         .unwrap();
 
+    println!("Session proof verified successfully.");
+
     let SessionProof {
         // The session header that was signed by the Notary is a succinct commitment to the TLS transcript.
         header,
@@ -54,6 +71,8 @@ fn main() {
     //
     // This returns the redacted transcripts
     let (mut sent, mut recv) = substrings.verify(&header).unwrap();
+
+    println!("Substrings proof verified successfully.");
 
     // Replace the bytes which the Prover chose not to disclose with 'X'
     sent.set_redacted(b'X');

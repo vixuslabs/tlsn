@@ -12,7 +12,7 @@ use tls_core::{
 
 use crate::{
     session::SessionHeader,
-    signature::{TLSNSignature, SignatureVerifyError},
+    signature::{SignatureVerifyError, TLSNSignature, TLSNSigningKeyTypeNames},
     HandshakeSummary, NotaryPublicKey, ServerName,
 };
 
@@ -62,15 +62,45 @@ impl SessionProof {
         notary_public_key: impl Into<NotaryPublicKey>,
         cert_verifier: &impl ServerCertVerifier,
     ) -> Result<(), SessionProofError> {
+
+        println!(" -- session - verify -- ");
+
         // Verify notary signature
         let signature = self
             .signature
             .as_ref()
             .ok_or(SessionProofError::MissingNotarySignature)?;
 
-        signature.verify(&self.header.to_data(), notary_public_key)?;
+        println!("session - have signature");
+
+
+
+        match &notary_public_key.into() {
+            NotaryPublicKey::P256(pub_key) => {
+                let pub_key_clone = pub_key.clone();
+
+
+                signature.verify(&self.header.to_data(TLSNSigningKeyTypeNames::P256), pub_key_clone)?;
+            }
+            NotaryPublicKey::MinaSchnorr(pub_key) => {
+
+                let pub_key_clone = pub_key.clone();
+
+                signature.verify(&self.header.to_data(TLSNSigningKeyTypeNames::MinaSchnorr), pub_key_clone)?;
+
+                // if let TLSNSignature::MinaSchnorr(_) = signature {
+                //     false
+                // } else {
+                //     true
+                // }
+            }
+        } 
+
+        // signature.verify(&self.header.to_data(), notary_public_key)?;
+        println!("session - signature verified");
         self.session_info
             .verify(self.header.handshake_summary(), cert_verifier)?;
+        println!("session - session info verified");
 
         Ok(())
     }

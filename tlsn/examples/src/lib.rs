@@ -226,6 +226,7 @@ pub fn notary_pubkey_full(signature_type: TLSNSigningKeyTypeNames) -> NotaryPubl
 
     match signature_type {
         TLSNSigningKeyTypeNames::P256 => {
+            println!("notary_pubkey_full - P256");
             let pem_file = str::from_utf8(include_bytes!(
                 "../../../notary-server/fixture/notary/notary.pub"
             ))
@@ -235,6 +236,7 @@ pub fn notary_pubkey_full(signature_type: TLSNSigningKeyTypeNames) -> NotaryPubl
             NotaryPublicKey::P256(pub_key_p256)
         }
         TLSNSigningKeyTypeNames::MinaSchnorr => {
+            println!("notary_pubkey_full - MinaSchnorr");
             let pub_key_str = str::from_utf8(include_bytes!(
                 "../../../notary-server/fixture/schnorr/notary.pub"
             )).unwrap();

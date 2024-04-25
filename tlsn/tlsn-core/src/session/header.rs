@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use mpz_garble_core::ChaChaEncoder;
 use tls_core::{handshake::HandshakeData, key::PublicKey};
 
-use crate::signature::Data;
+use crate::signature::{Data, TLSNSigningKeyTypeNames};
 use crate::{merkle::MerkleRoot, HandshakeSummary};
 use bcs;
 use mpz_core::serialize::CanonicalSerialize;
@@ -42,9 +42,23 @@ pub struct SessionHeader {
 
 impl SessionHeader {
     /// Serialize the session header to bytes
-    pub fn to_data(&self) -> Data {
-        let bytes = bcs::to_bytes(self).expect("serialization should not fail");
-        Data::from(&bytes)
+    pub fn to_data(&self, sig_type: TLSNSigningKeyTypeNames) -> Data {
+
+        match sig_type {
+            TLSNSigningKeyTypeNames::P256 => {
+                let bytes = self.to_bytes();
+
+                Data::P256(bytes)
+            },
+            TLSNSigningKeyTypeNames::MinaSchnorr => {
+                let bytes = bcs::to_bytes(self).expect("serialization should not fail");
+
+                Data::to_base_field(&bytes)
+
+                // Data::MinaSchnorr(bytes)
+            },
+        }
+
     }
 
     /// Create a new instance of SessionHeader
