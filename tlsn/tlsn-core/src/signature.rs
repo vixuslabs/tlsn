@@ -1,7 +1,7 @@
 //! Signature Mod
 
 use mina_hasher::{Hashable, ROInput};
-use mina_signer::{BaseField, Keypair, NetworkId, PubKey, ScalarField, SecKey, Signer};
+use mina_signer::{BaseField, Keypair, NetworkId, PubKey, ScalarField, SecKey, Signer as MinaSigner};
 use o1_utils::FieldHelpers;
 use p256::{
     ecdsa::{signature::Verifier, VerifyingKey},
@@ -14,7 +14,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use bitcoin;
 use serde::de::Error;
-// use signature::Signer;
+use signature::Signer;
 use std::{fmt, fmt::Formatter};
 
 /// A Notary public key.
@@ -315,26 +315,26 @@ impl TLSNSigningKey {
     }
 }
 
-// /// Sign the provided message bytestring using `Self` (e.g. a cryptographic key
-// /// or connection to an HSM), returning a digital signature.
-// impl Signer<TLSNSignature> for TLSNSigningKey {
-//     fn sign(&self, msg: &[u8]) -> TLSNSignature {
-//         self.try_sign(msg).expect("signature operation failed")
-//     }
+/// Sign the provided message bytestring using `Self` (e.g. a cryptographic key
+/// or connection to an HSM), returning a digital signature.
+impl Signer<TLSNSignature> for TLSNSigningKey {
+    fn sign(&self, msg: &[u8]) -> TLSNSignature {
+        self.try_sign(msg).expect("signature operation failed")
+    }
 
-//     fn try_sign(&self, msg: &[u8]) -> Result<TLSNSignature, signature::Error> {
-//         match self {
-//             TLSNSigningKey::MinaSchnorr(sk) => {
-//                 let mut ctx = mina_signer::create_kimchi::<Data>(NetworkId::TESTNET);
-//                 let key_pair =
-//                     Keypair::from_secret_key(sk.clone()).map_err(|_| signature::Error::new())?;
-//                 let sig = ctx.sign(&key_pair, &Data::to_base_field(msg));
-//                 Ok(TLSNSignature::MinaSchnorr(MinaSchnorrSignature(sig)))
-//             }
-//             TLSNSigningKey::P256(sk) => {
-//                 let sig = sk.try_sign(msg)?;
-//                 Ok(TLSNSignature::P256(sig))
-//             }
-//         }
-//     }
-// }
+    fn try_sign(&self, msg: &[u8]) -> Result<TLSNSignature, signature::Error> {
+        match self {
+            TLSNSigningKey::MinaSchnorr(sk) => {
+                let mut ctx = mina_signer::create_kimchi::<Data>(NetworkId::TESTNET);
+                let key_pair =
+                    Keypair::from_secret_key(sk.clone()).map_err(|_| signature::Error::new())?;
+                let sig = ctx.sign(&key_pair, &Data::to_base_field(msg));
+                Ok(TLSNSignature::MinaSchnorr(MinaSchnorrSignature(sig)))
+            }
+            TLSNSigningKey::P256(sk) => {
+                let sig = sk.try_sign(msg)?;
+                Ok(TLSNSignature::P256(sig))
+            }
+        }
+    }
+}
