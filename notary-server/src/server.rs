@@ -13,8 +13,6 @@ use hyper::server::{
 };
 use mina_signer::SecKey;
 use p256::pkcs8::DecodePrivateKey;
-// use p256::pkcs8::DecodePrivateKey;
-// use p256::{ecdsa::SigningKey, pkcs8::DecodePrivateKey};
 use rustls::{Certificate, PrivateKey, ServerConfig};
 use std::{
     fs::File as StdFile,
@@ -30,8 +28,10 @@ use tokio_rustls::TlsAcceptor;
 use tower::MakeService;
 use tracing::{debug, error, info};
 
+use tlsn_core::signature::{TLSNSigningKey, TLSNSigningKeyTypeNames};
+
 use crate::{
-    config::{NotaryServerProperties, NotarySigningKeyProperties, TLSNSigningKeyTypeNames},
+    config::{NotaryServerProperties, NotarySigningKeyProperties},
     domain::{
         auth::{authorization_whitelist_vec_into_hashmap, AuthorizationWhitelistRecord},
         notary::NotaryGlobals,
@@ -39,16 +39,15 @@ use crate::{
     },
     error::NotaryServerError,
     middleware::AuthorizationMiddleware,
-    service::{initialize, upgrade_protocol, TLSNSigningKey},
+    service::{initialize, upgrade_protocol},
     util::parse_csv_file,
 };
 
 /// Start a TCP server (with or without TLS) to accept notarization request for both TCP and WebSocket clients
 #[tracing::instrument(skip(config))]
 pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotaryServerError> {
-
     // Load the private key for notarized transcript signing
-    let notary_signing_key = load_notary_signing_key(&config.notary_key).await?;
+    // let notary_signing_key = load_notary_signing_key(&config.notary_key).await?;
     // Build TLS acceptor if it is turned on
     let tls_acceptor = if !config.tls.enabled {
         debug!("Skipping TLS setup as it is turned off.");
@@ -101,28 +100,26 @@ pub async fn run_server(config: &NotaryServerProperties) -> Result<(), NotarySer
     info!("Listening for TCP traffic at {}", notary_address);
 
     let protocol = Arc::new(Http::new());
-    // let notary_globals = NotaryGlobals::new(
-    //     notary_signing_key,
-    //     config.notarization.clone(),
-    //     // Use Arc to prevent cloning the whitelist for every request
-    //     authorization_whitelist.map(Arc::new),
-    // );
 
     let notary_globals = match config.notary_key.signing_key_type_name {
-        TLSNSigningKeyTypeNames::MinaSchnorr => NotaryGlobals::new_mina(
-            &config.notary_key,
-            config.notarization.clone(),
-            // Use Arc to prevent cloning the whitelist for every request
-            authorization_whitelist.map(Arc::new),
-        )
-        .await?,
-        TLSNSigningKeyTypeNames::P256 => NotaryGlobals::new_p256(
-            &config.notary_key,
-            config.notarization.clone(),
-            // Use Arc to prevent cloning the whitelist for every request
-            authorization_whitelist.map(Arc::new),
-        )
-        .await?,
+        TLSNSigningKeyTypeNames::MinaSchnorr => {
+            NotaryGlobals::new_mina(
+                &config.notary_key,
+                config.notarization.clone(),
+                // Use Arc to prevent cloning the whitelist for every request
+                authorization_whitelist.map(Arc::new),
+            )
+            .await?
+        }
+        TLSNSigningKeyTypeNames::P256 => {
+            NotaryGlobals::new_p256(
+                &config.notary_key,
+                config.notarization.clone(),
+                // Use Arc to prevent cloning the whitelist for every request
+                authorization_whitelist.map(Arc::new),
+            )
+            .await?
+        }
     };
 
     // Parameters needed for the info endpoint
@@ -233,7 +230,6 @@ async fn load_notary_signing_key(config: &NotarySigningKeyProperties) -> Result<
 
     let notary_signing_key = match config.signing_key_type_name {
         TLSNSigningKeyTypeNames::MinaSchnorr => {
-
             let path = &config.private_key_pem_path;
             let signing_key_bytes = tokio::fs::read(path).await?;
             let signing_key_str = std::str::from_utf8(&signing_key_bytes).unwrap();
@@ -241,15 +237,16 @@ async fn load_notary_signing_key(config: &NotarySigningKeyProperties) -> Result<
             let signing_key_schnorr = SecKey::from_base58(signing_key_str).unwrap();
 
             TLSNSigningKey::MinaSchnorr(signing_key_schnorr)
-        },
+        }
         TLSNSigningKeyTypeNames::P256 => {
             let path = &config.private_key_pem_path;
             let signing_key_bytes = tokio::fs::read(path).await?;
             let signing_key_str = std::str::from_utf8(&signing_key_bytes).unwrap();
-            let p256_signing_key = p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
+            let p256_signing_key =
+                p256::ecdsa::SigningKey::from_pkcs8_pem(signing_key_str).unwrap();
 
             TLSNSigningKey::P256(p256_signing_key)
-        },
+        }
     };
 
     debug!("Successfully loaded notary server's signing key!");

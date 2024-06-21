@@ -1,4 +1,5 @@
 use serde::Deserialize;
+use tlsn_core::signature::TLSNSigningKeyTypeNames;
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -49,13 +50,6 @@ pub struct TLSProperties {
     pub enabled: bool,
     pub private_key_pem_path: String,
     pub certificate_pem_path: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum TLSNSigningKeyTypeNames {
-    MinaSchnorr,
-    P256,
 }
 
 #[derive(Clone, Debug, Deserialize)]

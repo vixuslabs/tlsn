@@ -9,21 +9,13 @@ use axum::{
     response::{IntoResponse, Json, Response},
 };
 use axum_macros::debug_handler;
-use base64::Engine;
 use chrono::Utc;
-use mina_signer::{
-    keypair::Keypair, NetworkId, SecKey, Signature as MinaSignature, Signer as MinaSigner,
-};
-use sha1::digest::generic_array::GenericArray;
-use tlsn_core::signature::{Data, MinaSchnorrSignature, TLSNSignature};
-// use p256::ecdsa::{Signature, TLSNSigningKey};
+use tlsn_core::signature::{TLSNSignature, TLSNSigningKey};
 use tlsn_verifier::tls::{Verifier, VerifierConfig};
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::{debug, error, info, trace};
 use uuid::Uuid;
-
-use p256::pkcs8::DecodePrivateKey;
 
 use crate::{
     domain::notary::{
@@ -37,78 +29,6 @@ use crate::{
         websocket::websocket_notarize,
     },
 };
-use signature::Signer;
-
-#[derive(Clone, Debug)]
-pub enum TLSNSigningKey {
-    MinaSchnorr(SecKey),
-    P256(p256::ecdsa::SigningKey),
-}
-
-impl From<mina_signer::seckey::SecKey> for TLSNSigningKey {
-    fn from(key: SecKey) -> Self {
-        Self::MinaSchnorr(key)
-    }
-}
-
-impl From<p256::ecdsa::SigningKey> for TLSNSigningKey {
-    fn from(key: p256::ecdsa::SigningKey) -> Self {
-        Self::P256(key)
-    }
-}
-
-impl TLSNSigningKey {
-    pub fn read_default_schnorr_pem_file() -> Self {
-        Self::MinaSchnorr(SecKey::from_bytes(&[0u8; 32]).unwrap())
-    }
-
-    pub fn read_schnorr_pem_file(path: &str) -> Result<Self, ()> {
-        Ok(Self::MinaSchnorr(
-            SecKey::from_base58("EKFSmntAEAPm5CnYMsVpfSEuyNfbXfxy2vHW8HPxGyPPgm5xyRtN").unwrap(),
-        ))
-        // println!("path: {:?}", path);
-        // Ok(Self::MinaSchnorr(SecKey::from_base58(path).unwrap()))
-    }
-
-    pub fn read_p256_pem_file(path: &str) -> Result<Self, eyre::Error> {
-        let signing_key = p256::ecdsa::SigningKey::read_pkcs8_pem_file(path)
-            .map_err(|err| eyre::eyre!("Failed to parse P256 PEM file: {}", err))?;
-
-        Ok(Self::P256(signing_key))
-
-        // let signing_key_str = std::fs::read_to_string(DEFAULT_PEM_PATH)
-        // .map_err(|_| ())?;
-
-        // Ok(Self::P256(p256::ecdsa::SigningKey::read_pkcs8_pem_file(signing_key_str).unwrap()))
-
-        // Ok(Self::P256(p256::ecdsa::SigningKey::read_pkcs8_pem_file(path).unwrap()))
-    }
-}
-
-/// Sign the provided message bytestring using `Self` (e.g. a cryptographic key
-/// or connection to an HSM), returning a digital signature.
-impl Signer<tlsn_core::TLSNSignature> for TLSNSigningKey {
-    fn sign(&self, msg: &[u8]) -> tlsn_core::TLSNSignature {
-        self.try_sign(msg).expect("signature operation failed")
-    }
-
-    fn try_sign(&self, msg: &[u8]) -> Result<tlsn_core::TLSNSignature, signature::Error> {
-        match self {
-            TLSNSigningKey::MinaSchnorr(sk) => {
-                let mut ctx =
-                    mina_signer::create_kimchi::<tlsn_core::signature::Data>(NetworkId::TESTNET);
-                let key_pair =
-                    Keypair::from_secret_key(sk.clone()).map_err(|_| signature::Error::new())?;
-                let sig = ctx.sign(&key_pair, &Data::to_base_field(msg));
-                Ok(TLSNSignature::MinaSchnorr(MinaSchnorrSignature(sig)))
-            }
-            TLSNSigningKey::P256(sk) => {
-                let sig = sk.try_sign(msg)?;
-                Ok(tlsn_core::TLSNSignature::P256(sig))
-            }
-        }
-    }
-}
 
 /// A wrapper enum to facilitate extracting TCP connection for either WebSocket or TCP clients,
 /// so that we can use a single endpoint and handler for notarization for both types of clients
@@ -253,20 +173,6 @@ pub async fn notary_service<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     Verifier::new(config)
         .notarize::<_, TLSNSignature>(socket.compat(), signing_key)
         .await?;
-
-    // match signing_key {
-    //     TLSNSigningKey::MinaSchnorr(key) => {
-    //         Verifier::new(config)
-    //             .notarize::<_, TLSNSignature>(socket.compat(), signing_key)
-    //             .await?;
-    //     }
-    //     TLSNSigningKey::P256(key) => {
-    //         Verifier::new(config)
-    //             .notarize::<_, p256::ecdsa::Signature>(socket.compat(), key)
-    //             .await?;
-    //     },
-    //     // _ => unimplemented!("Mina Schnorr notarization is not yet implemented")
-    // }
 
     Ok(())
 }

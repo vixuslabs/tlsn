@@ -1,23 +1,13 @@
-use std::{collections::HashMap, sync::Arc};
-
 use chrono::{DateTime, Utc};
-use p256::ecdsa::SigningKey as P256SigningKey;
 use serde::{Deserialize, Serialize};
+use std::{collections::HashMap, sync::Arc};
+use tlsn_core::signature::TLSNSigningKey;
 use tokio::sync::Mutex;
 
 pub use crate::{
-    config::NotarizationProperties, 
-    domain::auth::AuthorizationWhitelistRecord, 
-    service::TLSNSigningKey, 
-    NotaryServerError, 
-    NotarySigningKeyProperties
+    config::NotarizationProperties, domain::auth::AuthorizationWhitelistRecord, NotaryServerError,
+    NotarySigningKeyProperties,
 };
-
-// #[derive(Clone, Debug)]
-// pub enum SigningKeyType {
-//     MinaSchnorr(mina_signer),
-//     P256(P256SigningKey),
-// }
 
 /// Response object of the /session API
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -77,11 +67,15 @@ impl NotaryGlobals {
         notarization_config: NotarizationProperties,
         authorization_whitelist: Option<Arc<HashMap<String, AuthorizationWhitelistRecord>>>,
     ) -> Result<Self, NotaryServerError> {
-
-        let notary_signing_key = match TLSNSigningKey::read_schnorr_pem_file(&config.private_key_pem_path) {
-            Ok(key) => key,
-            Err(err) => return Err(NotaryServerError::Connection("Failed to read Mina Schnorr private key".to_string())),
-        };
+        let notary_signing_key =
+            match TLSNSigningKey::read_schnorr_pem_file(&config.private_key_pem_path) {
+                Ok(key) => key,
+                Err(_err) => {
+                    return Err(NotaryServerError::Connection(
+                        "Failed to read Mina Schnorr private key".to_string(),
+                    ))
+                }
+            };
         Ok(Self {
             notary_signing_key,
             notarization_config,
@@ -95,11 +89,15 @@ impl NotaryGlobals {
         notarization_config: NotarizationProperties,
         authorization_whitelist: Option<Arc<HashMap<String, AuthorizationWhitelistRecord>>>,
     ) -> Result<Self, NotaryServerError> {
-
-        let notary_signing_key = match TLSNSigningKey::read_p256_pem_file(&config.private_key_pem_path) {
-            Ok(key) => key,
-            Err(err) => return Err(NotaryServerError::Connection("Failed to read P256 private key".to_string())),
-        };
+        let notary_signing_key =
+            match TLSNSigningKey::read_p256_pem_file(&config.private_key_pem_path) {
+                Ok(key) => key,
+                Err(_err) => {
+                    return Err(NotaryServerError::Connection(
+                        "Failed to read P256 private key".to_string(),
+                    ))
+                }
+            };
         Ok(Self {
             notary_signing_key,
             notarization_config,
@@ -121,7 +119,6 @@ impl NotaryGlobals {
 //         // };
 //        let notary_globals = match signing_key_type {
 //             SigningKeyType::MinaSchnorr(key) => {
-                
 
 //                 NotaryGlobals {
 //                     notary_signing_key: SigningKeyType::MinaSchnorr(key),
@@ -129,7 +126,7 @@ impl NotaryGlobals {
 //                     store: Default::default(),
 //                     authorization_whitelist,
 //                 }
-                
+
 //             },
 //             SigningKeyType::P256(key) => {
 
