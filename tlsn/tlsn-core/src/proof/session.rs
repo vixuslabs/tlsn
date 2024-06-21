@@ -2,7 +2,7 @@ use web_time::{Duration, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
-use mpz_core::{commit::Decommitment, serialize::CanonicalSerialize};
+use mpz_core::commit::Decommitment;
 use tls_core::{
     anchors::{OwnedTrustAnchor, RootCertStore},
     dns::ServerName as TlsServerName,
@@ -62,7 +62,6 @@ impl SessionProof {
         notary_public_key: impl Into<NotaryPublicKey>,
         cert_verifier: &impl ServerCertVerifier,
     ) -> Result<(), SessionProofError> {
-
         println!(" -- session - verify -- ");
 
         // Verify notary signature
@@ -73,28 +72,24 @@ impl SessionProof {
 
         println!("session - have signature");
 
-
-
         match &notary_public_key.into() {
             NotaryPublicKey::P256(pub_key) => {
                 let pub_key_clone = pub_key.clone();
 
-
-                signature.verify(&self.header.to_data(TLSNSigningKeyTypeNames::P256), pub_key_clone)?;
+                signature.verify(
+                    &self.header.to_data(TLSNSigningKeyTypeNames::P256),
+                    pub_key_clone,
+                )?;
             }
             NotaryPublicKey::MinaSchnorr(pub_key) => {
-
                 let pub_key_clone = pub_key.clone();
 
-                signature.verify(&self.header.to_data(TLSNSigningKeyTypeNames::MinaSchnorr), pub_key_clone)?;
-
-                // if let TLSNSignature::MinaSchnorr(_) = signature {
-                //     false
-                // } else {
-                //     true
-                // }
+                signature.verify(
+                    &self.header.to_data(TLSNSigningKeyTypeNames::MinaSchnorr),
+                    pub_key_clone,
+                )?;
             }
-        } 
+        }
 
         // signature.verify(&self.header.to_data(), notary_public_key)?;
         println!("session - signature verified");

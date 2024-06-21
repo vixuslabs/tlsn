@@ -1,21 +1,22 @@
 //! Signature Mod
 
 use mina_hasher::{Hashable, ROInput};
-use mina_signer::{BaseField, Keypair, NetworkId, PubKey, ScalarField, SecKey, Signer as MinaSigner};
+use mina_signer::{
+    BaseField, Keypair, NetworkId, PubKey, ScalarField, SecKey, Signer as MinaSigner,
+};
 use o1_utils::FieldHelpers;
 use p256::{
     ecdsa::{signature::Verifier, VerifyingKey},
-    elliptic_curve::generic_array::GenericArray,
     pkcs8::DecodePrivateKey,
 };
 
-use serde::de::{self, MapAccess, Visitor};
+use serde::de::{self, Visitor};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use bitcoin;
 use serde::de::Error;
 use signature::Signer;
-use std::{fmt, fmt::Formatter};
+use std::fmt;
 
 /// A Notary public key.
 #[derive(Debug, Clone)]
