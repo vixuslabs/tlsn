@@ -3,14 +3,13 @@ use std::ops::Range;
 use p256::{
     ecdsa::{
         signature::{SignerMut, Verifier},
-        Signature as P256Signature, SigningKey,
+        SigningKey,
     },
     PublicKey,
 };
 use rand_chacha::ChaCha20Rng;
 use rand_core::SeedableRng;
 
-use signature::Keypair;
 use tls_core::{
     cert::ServerCertDetails,
     handshake::HandshakeData,
@@ -100,10 +99,8 @@ fn test_api() {
     // Notary receives the raw signing key from some outer context
     let mut signer = TLSNSigningKey::from_bytes(&raw_key, TLSNSigningKeyTypeNames::P256).unwrap();
 
-
-
     if let TLSNSigningKey::P256(ref mut key) = signer {
-        let notary_publickey = PublicKey::from(key.verifying_key());
+        let _notary_publickey = PublicKey::from(key.verifying_key());
 
         let notary_pubkey = PublicKey::from(key.verifying_key());
 
@@ -119,84 +116,84 @@ fn test_api() {
             // the session's end time and TLS handshake start time may be a few mins apart
             HandshakeSummary::new(time + 60, ephem_key.clone(), hs_commitment),
         );
-    
+
         let signature: TLSNSignature = signer.sign(&header.to_bytes());
         // Notary creates a msg and sends it to Prover
         let msg = SignedSessionHeader {
             header,
             signature: signature.into(),
         };
-    
+
         //---------------------------------------
         let msg_bytes = bincode::serialize(&msg).unwrap();
         let SignedSessionHeader { header, signature } = bincode::deserialize(&msg_bytes).unwrap();
         //---------------------------------------
 
-            // Prover verifies the signature
-    #[allow(irrefutable_let_patterns)]
-    if let TLSNSignature::P256(signature) = signature {
-        notary_verifing_key
-            .verify(&header.to_bytes(), &signature)
+        // Prover verifies the signature
+        #[allow(irrefutable_let_patterns)]
+        if let TLSNSignature::P256(signature) = signature {
+            notary_verifing_key
+                .verify(&header.to_bytes(), &signature)
+                .unwrap();
+        } else {
+            panic!("Notary TLSNSignature signature is not P256");
+        };
+
+        // Prover verifies the header and stores it with the signature in NotarizedSession
+        header
+            .verify(
+                time,
+                &ephem_key,
+                &notarized_session_data.commitments().merkle_root(),
+                header.encoder_seed(),
+                &notarized_session_data.session_info().handshake_decommitment,
+            )
             .unwrap();
-    } else {
-        panic!("Notary TLSNSignature signature is not P256");
-    };
 
-    // Prover verifies the header and stores it with the signature in NotarizedSession
-    header
-        .verify(
-            time,
-            &ephem_key,
-            &notarized_session_data.commitments().merkle_root(),
-            header.encoder_seed(),
-            &notarized_session_data.session_info().handshake_decommitment,
-        )
-        .unwrap();
+        let session = NotarizedSession::new(header, Some(signature), notarized_session_data);
 
-    let session = NotarizedSession::new(header, Some(signature), notarized_session_data);
+        // Prover converts NotarizedSession into SessionProof and SubstringsProof and sends them to the Verifier
+        let session_proof = session.session_proof();
 
-    // Prover converts NotarizedSession into SessionProof and SubstringsProof and sends them to the Verifier
-    let session_proof = session.session_proof();
+        let mut substrings_proof_builder = session.data().build_substrings_proof();
 
-    let mut substrings_proof_builder = session.data().build_substrings_proof();
+        substrings_proof_builder
+            .reveal_by_id(commitment_id_1)
+            .unwrap()
+            .reveal_by_id(commitment_id_2)
+            .unwrap();
 
-    substrings_proof_builder
-        .reveal_by_id(commitment_id_1)
-        .unwrap()
-        .reveal_by_id(commitment_id_2)
-        .unwrap();
+        let substrings_proof = substrings_proof_builder.build().unwrap();
 
-    let substrings_proof = substrings_proof_builder.build().unwrap();
+        //---------------------------------------
+        let session_proof_bytes = bincode::serialize(&session_proof).unwrap();
+        let substrings_proof_bytes = bincode::serialize(&substrings_proof).unwrap();
+        let session_proof: SessionProof = bincode::deserialize(&session_proof_bytes).unwrap();
+        let substrings_proof: SubstringsProof =
+            bincode::deserialize(&substrings_proof_bytes).unwrap();
+        //---------------------------------------
 
-    //---------------------------------------
-    let session_proof_bytes = bincode::serialize(&session_proof).unwrap();
-    let substrings_proof_bytes = bincode::serialize(&substrings_proof).unwrap();
-    let session_proof: SessionProof = bincode::deserialize(&session_proof_bytes).unwrap();
-    let substrings_proof: SubstringsProof = bincode::deserialize(&substrings_proof_bytes).unwrap();
-    //---------------------------------------
+        // The Verifier does:
+        session_proof
+            .verify_with_default_cert_verifier(notary_pubkey)
+            .unwrap();
 
-    // The Verifier does:
-    session_proof
-        .verify_with_default_cert_verifier(notary_pubkey)
-        .unwrap();
+        let SessionProof {
+            header,
+            session_info,
+            ..
+        } = session_proof;
 
-    let SessionProof {
-        header,
-        session_info,
-        ..
-    } = session_proof;
+        // assert dns name is expected
+        assert_eq!(
+            session_info.server_name.as_ref(),
+            testdata.dns_name.as_str()
+        );
 
-    // assert dns name is expected
-    assert_eq!(
-        session_info.server_name.as_ref(),
-        testdata.dns_name.as_str()
-    );
+        let (sent, recv) = substrings_proof.verify(&header).unwrap();
 
-    let (sent, recv) = substrings_proof.verify(&header).unwrap();
-
-    assert_eq!(&sent.data()[range1], b"se".as_slice());
-    assert_eq!(&recv.data()[range2], b"ec".as_slice());
-        
+        assert_eq!(&sent.data()[range1], b"se".as_slice());
+        assert_eq!(&recv.data()[range2], b"ec".as_slice());
     } else {
         panic!("Notary TLSNSigningKey is not P256");
     }

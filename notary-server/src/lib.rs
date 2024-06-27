@@ -9,14 +9,12 @@ mod util;
 
 pub use config::{
     AuthorizationProperties, LoggingProperties, NotarizationProperties, NotaryServerProperties,
-    NotarySigningKeyProperties, ServerProperties, TLSNSigningKeyTypeNames, TLSProperties,
+    NotarySigningKeyProperties, ServerProperties, TLSProperties,
 };
 pub use domain::{
     cli::CliFields,
     notary::{ClientType, NotarizationSessionRequest, NotarizationSessionResponse},
 };
-
-pub use service::TLSNSigningKey;
 
 pub use error::NotaryServerError;
 pub use server::{read_pem_file, run_server};
